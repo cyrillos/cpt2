@@ -78,5 +78,6 @@ extern int write_netdevs(context_t *ctx);
 extern void free_netdevs(context_t *ctx);
 
 extern int write_socket(context_t *ctx, struct file_struct *file);
+extern int write_ifaddr(context_t *ctx);
 
 #endif /* __CPT2_NET_H__ */

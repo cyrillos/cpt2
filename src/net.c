@@ -11,14 +11,17 @@
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <linux/if_addr.h>
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 
+#include "libnetlink.h"
 #include "cpt-image.h"
 #include "hashtable.h"
 #include "xmalloc.h"
 #include "image.h"
+#include "mslab.h"
 #include "read.h"
 #include "task.h"
 #include "net.h"
@@ -574,6 +577,86 @@ int read_sockets(context_t *ctx)
 		show_sock_cont(ctx, sk);
 	}
 	pr_read_end();
+
+	return 0;
+}
+
+int write_ifaddr(context_t *ctx)
+{
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_IFADDR);
+	u32 magic = IFADDR_DUMP_MAGIC;
+	off_t start, end;
+
+	if (write_data(fd, &magic, sizeof(magic))) {
+		pr_err("Failed to write ifaddr magic\n");
+		return -1;
+	}
+
+	pr_read_start("net interface addresses\n");
+	get_section_bounds(ctx, CPT_SECT_NET_IFADDR, &start, &end);
+
+	while (start < end) {
+		struct ifa_cacheinfo ci = { };
+		struct cpt_ifaddr_image v;
+		struct ifaddrmsg *ifm;
+		struct nlmsghdr *nlh;
+		char buf[8192];
+		mslab_t *m;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_NET_IFADDR, &v, start)) {
+			pr_err("Can't read ifaddr object at @%li\n", (long)start);
+			return -1;
+		}
+
+		if (v.cpt_family != PF_INET && v.cpt_family != PF_INET6) {
+			pr_err("Usupported family %u at @%li\n",
+			       (unsigned int)v.cpt_family, (long)start);
+			return -1;
+		}
+
+		if (!netdev_lookup(v.cpt_index)) {
+			pr_err("No net device with index %u at @%li\n",
+			       v.cpt_index, (long)start);
+			return -1;
+		}
+
+		v.cpt_label[sizeof(v.cpt_label) - 1] = '\0';
+		m = mslab_cast(buf, sizeof(buf));
+
+		nlh = nlmsg_put(m, 0, 0, RTM_NEWADDR, sizeof(*ifm), NLM_F_MULTI);
+		BUG_ON(!nlh);
+
+		ifm = nlmsg_data(nlh);
+
+		ifm->ifa_index		= v.cpt_index;
+		ifm->ifa_family		= v.cpt_family;
+		ifm->ifa_prefixlen	= v.cpt_masklen;
+		ifm->ifa_flags		= v.cpt_flags;
+		ifm->ifa_scope		= v.cpt_scope;
+
+		if (v.cpt_family == PF_INET) {
+			nla_put(m, IFA_ADDRESS, sizeof(v.cpt_peer[0]), v.cpt_peer);
+			nla_put(m, IFA_LOCAL, sizeof(v.cpt_address[0]), v.cpt_address);
+			nla_put(m, IFA_BROADCAST, sizeof(v.cpt_broadcast[0]), v.cpt_broadcast);
+			nla_put_string(m, IFA_LABEL, (const char *)v.cpt_label);
+		} else if (v.cpt_family == PF_INET6) {
+			nla_put(m, IFA_ADDRESS, sizeof(v.cpt_peer), v.cpt_peer);
+		}
+
+		ci.ifa_prefered		= v.cpt_prefered_lft;
+		ci.ifa_valid		= v.cpt_valid_lft;
+
+		nla_put(m, IFA_CACHEINFO, sizeof(ci), &ci);
+		nlmsg_end(m, nlh);
+
+		if (write_data(fd, mslab_payload_pointer(m),
+			       mslab_payload_size(m))) {
+			pr_err("Failed to write ifaddrmsg\n");
+			return -1;
+		}
+
+		start += v.cpt_next;
+	}
 
 	return 0;
 }

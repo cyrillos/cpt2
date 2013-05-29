@@ -230,6 +230,13 @@ int convert_ns(context_t *ctx)
 		goto out;
 	}
 
+	ret = write_ifaddr(ctx);
+	if (ret) {
+		pr_err("Failed writing interface addresses for task %d\n",
+		       root_task->ti.cpt_pid);
+		goto out;
+	}
+
 out:
 	return ret;
 }
