@@ -34,10 +34,7 @@ int context_init_fdset_glob(context_t *ctx)
 
 void context_fini_fdset_glob(context_t *ctx)
 {
-	if (ctx->fdset_glob) {
-		fdset_close(ctx->fdset_glob, _CR_FD_GLOB_FROM, _CR_FD_GLOB_TO);
-		fdset_free(&ctx->fdset_glob);
-	}
+	fdset_free(&ctx->fdset_glob);
 }
 
 void context_init(context_t *ctx)
