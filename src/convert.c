@@ -148,6 +148,14 @@ int convert(void)
 		goto out;
 	}
 
+	/*
+	 * No nested namespace support in CRIU, thus
+	 * just get pid from the root task.
+	 */
+	ret = context_init_fdset_ns(&ctx, root_task->ti.cpt_pid);
+	if (ret)
+		goto out;
+
 	ret = write_task_images(&ctx);
 	if (ret) {
 		pr_err("Failed to write task images\n");

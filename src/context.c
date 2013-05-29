@@ -32,9 +32,38 @@ int context_init_fdset_glob(context_t *ctx)
 	return 0;
 }
 
+int context_init_fdset_ns(context_t *ctx, pid_t pid)
+{
+	struct fdset *fdset;
+
+	context_fini_fdset_ns(ctx);
+
+	fdset = fdset_alloc(_CR_FD_NS_FROM,
+			    _CR_FD_NS_TO - _CR_FD_NS_FROM);
+	if (!fdset) {
+		pr_err("Can't allocate ns fdset\n");
+		return -1;
+	}
+	ctx->fdset_ns = fdset;
+
+	if (open_image_fdset(ctx, fdset, pid,
+			     _CR_FD_NS_FROM,
+			     _CR_FD_NS_TO, O_DUMP)) {
+		pr_err("Failed to open ns fdset\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 void context_fini_fdset_glob(context_t *ctx)
 {
 	fdset_free(&ctx->fdset_glob);
+}
+
+void context_fini_fdset_ns(context_t *ctx)
+{
+	fdset_free(&ctx->fdset_ns);
 }
 
 void context_init(context_t *ctx)
@@ -49,4 +78,5 @@ void context_fini(context_t *ctx)
 	close_safe(&ctx->dfd);
 	close_safe(&ctx->rootfd);
 	context_fini_fdset_glob(ctx);
+	context_fini_fdset_ns(ctx);
 }

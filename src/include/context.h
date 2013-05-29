@@ -36,6 +36,7 @@ typedef struct context {
 	off_t			sections[CPT_SECT_MAX][2];
 
 	struct fdset		*fdset_glob;
+	struct fdset		*fdset_ns;
 } context_t;
 
 extern void context_init(context_t *ctx);
@@ -43,5 +44,8 @@ extern void context_fini(context_t *ctx);
 
 extern int context_init_fdset_glob(context_t *ctx);
 extern void context_fini_fdset_glob(context_t *ctx);
+
+extern int context_init_fdset_ns(context_t *ctx, pid_t pid);
+extern void context_fini_fdset_ns(context_t *ctx);
 
 #endif /* __CPT2_CONTEXT_H__ */
