@@ -76,8 +76,6 @@ extern struct sock_struct *sk_lookup_file(u64 cpt_file);
 extern int read_netdevs(context_t *ctx);
 extern void free_netdevs(context_t *ctx);
 
-extern int write_task_route(context_t *ctx, struct task_struct *t);
-extern int write_task_ifaddr(context_t *ctx, struct task_struct *t);
 extern int write_socket(context_t *ctx, struct file_struct *file);
 
 #endif /* __CPT2_NET_H__ */

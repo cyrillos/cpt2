@@ -74,18 +74,14 @@ static int setfstype(MntEntry *e, struct vfsmnt_struct *v)
 	return -1;
 }
 
-int write_task_mountpoints(context_t *ctx, struct task_struct *t)
+static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 {
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_MOUNTPOINTS);
 	struct vfsmnt_struct *v;
 	struct ns_struct *ns;
 	MntEntry e;
 
-	int ret = 0;
-	int fd = -1;
-
-	fd = open_image(ctx, CR_FD_MOUNTPOINTS, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
+	BUG_ON(t != root_task);
 
 	ns = obj_lookup_to(CPT_OBJ_NAMESPACE, t->ti.cpt_namespace);
 	if (!ns) {
@@ -99,7 +95,7 @@ int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 
 		if (setfstype(&e, v)) {
 			pr_err("Can't encode fs type %s\n", v->mnt_type);
-			goto out;
+			return -1;
 		}
 
 		e.mnt_id		= obj_id_of(v);
@@ -111,14 +107,11 @@ int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 		e.source		= v->mnt_dev;
 		e.options		= NULL;
 
-		ret = pb_write_one(fd, &e, PB_MOUNTPOINTS);
-		if (ret)
-			goto out;
+		if (pb_write_one(fd, &e, PB_MOUNTPOINTS))
+			return -1;
 	}
 
-out:
-	close_safe(&fd);
-	return ret;
+	return 0;
 }
 
 int read_ns(context_t *ctx)
@@ -214,6 +207,21 @@ int read_ns(context_t *ctx)
 	}
 	ret = 0;
 	pr_read_end();
+out:
+	return ret;
+}
+
+int convert_ns(context_t *ctx)
+{
+	int ret;
+
+	ret = write_task_mountpoints(ctx, root_task);
+	if (ret) {
+		pr_err("Failed writing mountpoints for task %d\n",
+		       root_task->ti.cpt_pid);
+		goto out;
+	}
+
 out:
 	return ret;
 }

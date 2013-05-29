@@ -33,7 +33,7 @@ struct ns_struct {
 extern struct ns_struct *root_ns;
 
 extern int read_ns(context_t *ctx);
-extern int write_task_mountpoints(context_t *ctx, struct task_struct *t);
+extern int convert_ns(context_t *ctx);
 extern void free_ns(context_t *ctx);
 
 #endif /* __CPT2_NS_H__ */

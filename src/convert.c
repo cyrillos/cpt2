@@ -17,6 +17,7 @@
 #include "log.h"
 #include "net.h"
 #include "mm.h"
+#include "ns.h"
 
 #include "protobuf/inventory.pb-c.h"
 
@@ -165,6 +166,12 @@ int convert(void)
 	ret = write_pstree(&ctx);
 	if (ret) {
 		pr_err("Failed writting process tree\n");
+		goto out;
+	}
+
+	ret = convert_ns(&ctx);
+	if (ret) {
+		pr_err("Failed writting ns related data\n");
 		goto out;
 	}
 

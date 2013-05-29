@@ -84,42 +84,6 @@ struct netdev_struct *netdev_lookup(u32 cpt_index)
 	return NULL;
 }
 
-int write_task_route(context_t *ctx, struct task_struct *t)
-{
-	u32 magic = ROUTE_DUMP_MAGIC;
-	int ret = 0, fd = -1;
-
-	fd = open_image(ctx, CR_FD_ROUTE, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
-
-	ret = write_data(fd, &magic, sizeof(magic));
-	if (ret)
-		pr_err("Failed to write route magic (pid %d)\n",
-		       t->ti.cpt_pid);
-
-	close_safe(&fd);
-	return ret;
-}
-
-int write_task_ifaddr(context_t *ctx, struct task_struct *t)
-{
-	u32 magic = IFADDR_DUMP_MAGIC;
-	int ret = 0, fd = -1;
-
-	fd = open_image(ctx, CR_FD_IFADDR, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
-
-	ret = write_data(fd, &magic, sizeof(magic));
-	if (ret)
-		pr_err("Failed to write ipadd magic (pid %d)\n",
-		       t->ti.cpt_pid);
-
-	close_safe(&fd);
-	return ret;
-}
-
 static bool can_dump_unix_sk(const struct sock_struct *sk)
 {
 	if (sk->si.cpt_type != SOCK_STREAM &&

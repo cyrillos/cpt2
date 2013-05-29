@@ -507,20 +507,6 @@ out:
 	return ret;
 }
 
-static int write_task_netdev(context_t *ctx, struct task_struct *t)
-{
-	int ret = 0;
-	int fd = -1;
-
-	fd = open_image(ctx, CR_FD_NETDEV, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
-	goto out;
-out:
-	close_safe(&fd);
-	return ret;
-}
-
 static int __write_task_images(context_t *ctx, struct task_struct *t)
 {
 	int ret;
@@ -609,37 +595,9 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 		goto out;
 	}
 
-	ret = write_task_mountpoints(ctx, t);
-	if (ret) {
-		pr_err("Failed writing mountpoints for task %d\n",
-		       t->ti.cpt_pid);
-		goto out;
-	}
-
 	ret = write_task_flocks(ctx, t);
 	if (ret) {
 		pr_err("Failed writing file locks for task %d\n",
-		       t->ti.cpt_pid);
-		goto out;
-	}
-
-	ret = write_task_netdev(ctx, t);
-	if (ret) {
-		pr_err("Failed writing netdev for task %d\n",
-		       t->ti.cpt_pid);
-		goto out;
-	}
-
-	ret = write_task_ifaddr(ctx, t);
-	if (ret) {
-		pr_err("Failed writing ifaddr for task %d\n",
-		       t->ti.cpt_pid);
-		goto out;
-	}
-
-	ret = write_task_route(ctx, t);
-	if (ret) {
-		pr_err("Failed writing route for task %d\n",
 		       t->ti.cpt_pid);
 		goto out;
 	}
