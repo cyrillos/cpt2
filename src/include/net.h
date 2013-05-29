@@ -74,6 +74,7 @@ extern void free_sockets(context_t *ctx);
 extern struct sock_struct *sk_lookup_file(u64 cpt_file);
 
 extern int read_netdevs(context_t *ctx);
+extern int write_netdevs(context_t *ctx);
 extern void free_netdevs(context_t *ctx);
 
 extern int write_socket(context_t *ctx, struct file_struct *file);

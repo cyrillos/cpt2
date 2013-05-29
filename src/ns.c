@@ -13,6 +13,7 @@
 #include "read.h"
 #include "task.h"
 #include "obj.h"
+#include "net.h"
 #include "ns.h"
 
 #include "protobuf.h"
@@ -218,6 +219,13 @@ int convert_ns(context_t *ctx)
 	ret = write_task_mountpoints(ctx, root_task);
 	if (ret) {
 		pr_err("Failed writing mountpoints for task %d\n",
+		       root_task->ti.cpt_pid);
+		goto out;
+	}
+
+	ret = write_netdevs(ctx);
+	if (ret) {
+		pr_err("Failed writing net devices for task %d\n",
 		       root_task->ti.cpt_pid);
 		goto out;
 	}

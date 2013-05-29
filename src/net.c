@@ -588,6 +588,44 @@ void free_netdevs(context_t *ctx)
 	}
 }
 
+static int write_netdev(context_t *ctx, struct netdev_struct *dev)
+{
+	NetDeviceEntry netdev = NET_DEVICE_ENTRY__INIT;
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_NETDEV);
+
+	if (!strncmp((char *)dev->ni.cpt_name, "lo", 2))
+		netdev.type = ND_TYPE__LOOPBACK;
+	else if (!strncmp((char *)dev->ni.cpt_name, "veth", 4))
+		netdev.type = ND_TYPE__VETH;
+	else if (!strncmp((char *)dev->ni.cpt_name, "venet", 5)) {
+		pr_info("Netdevice `%s' detected, ignore\n", dev->ni.cpt_name);
+		return 0;
+	} else {
+		pr_err("Unsupported netdevice `%s'\n",
+		       dev->ni.cpt_name);
+		return -1;
+	}
+
+	netdev.ifindex	= dev->ni.cpt_index;
+	netdev.mtu	= dev->ni.cpt_mtu;
+	netdev.flags	= dev->ni.cpt_flags;
+	netdev.name	= (char *)dev->ni.cpt_name;
+
+	return pb_write_one(fd, &netdev, PB_NETDEV);
+}
+
+int write_netdevs(context_t *ctx)
+{
+	struct netdev_struct *dev;
+
+	list_for_each_entry(dev, &netdev_list, list) {
+		if (write_netdev(ctx, dev))
+			return -1;
+	}
+
+	return 0;
+}
+
 static void show_netdev_cont(context_t *ctx, struct netdev_struct *dev)
 {
 	unsigned int i;
