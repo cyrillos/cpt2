@@ -14,3 +14,5 @@ cpt2
 src/res/vdso-rhel.h
 src/res/vdso-rhel5.c
 src/res/vdso-rhel6.c
+test
+patches
