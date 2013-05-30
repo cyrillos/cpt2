@@ -36,8 +36,10 @@ void fdset_close(struct fdset *fdset, unsigned int from, unsigned int to)
 
 static inline void __fdset_free(struct fdset *fdset)
 {
-	fdset_close(fdset, fdset->offset, fdset->number);
-	xfree(fdset);
+	if (fdset) {
+		fdset_close(fdset, fdset->offset, fdset->number);
+		xfree(fdset);
+	}
 }
 
 void fdset_free(struct fdset **fdset)
