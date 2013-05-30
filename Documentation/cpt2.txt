@@ -1,0 +1,37 @@
+cpt2(1)
+=======
+:doctype:       manpage
+:man source:    cpt2
+:man version:   0.0.1
+:man manual:    cpt2 manual
+
+NAME
+----
+cpt2 - convert OpenVZ dump files to CRIU format
+
+SYNOPSIS
+--------
+*cpt2* -f <dumpfile> -r <root> [-D <dir>]
+
+DESCRIPTION
+-----------
+*cpt2* is command line utility to convert OpenVZ dump files to CRIU format.
+
+OPTIONS
+-------
+*-f*, *--file* 'dumpfile'::
+    Convert OpenVZ dump file identified by 'dumpfile'.
+
+*-r*, *--root* 'root'::
+    Path to container 'root' file system.
+
+*-D* 'dir'::
+    Put CRIU files generated to directory 'dir'.
+
+AUTHOR
+------
+OpenVZ team.
+
+COPYING
+-------
+Copyright \(C) 2012-2013, Parallels Inc.

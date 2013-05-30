@@ -1,0 +1,16 @@
+*.o
+*.d
+*.img
+*.bin
+*.elf
+*.out
+*.swp
+*.swo
+.git-ignore
+cscope*
+tags
+TAGS
+cpt2
+src/res/vdso-rhel.h
+src/res/vdso-rhel5.c
+src/res/vdso-rhel6.c
