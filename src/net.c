@@ -661,6 +661,19 @@ int write_ifaddr(context_t *ctx)
 	return 0;
 }
 
+int write_routes(context_t *ctx)
+{
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
+	u32 magic = ROUTE_DUMP_MAGIC;
+
+	if (write_data(fd, &magic, sizeof(magic))) {
+		pr_err("Failed to write route magic\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 void free_netdevs(context_t *ctx)
 {
 	struct netdev_struct *dev, *tmp;

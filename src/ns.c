@@ -237,6 +237,13 @@ int convert_ns(context_t *ctx)
 		goto out;
 	}
 
+	ret = write_routes(ctx);
+	if (ret) {
+		pr_err("Failed writing routes for task %d\n",
+		       root_task->ti.cpt_pid);
+		goto out;
+	}
+
 out:
 	return ret;
 }
