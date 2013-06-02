@@ -69,6 +69,12 @@ struct netdev_struct {
 	struct cpt_hwaddr_image		hwi;
 };
 
+struct ifaddr_struct {
+	struct list_head		list;
+
+	struct cpt_ifaddr_image		ii;
+};
+
 extern int read_sockets(context_t *ctx);
 extern void free_sockets(context_t *ctx);
 extern struct sock_struct *sk_lookup_file(u64 cpt_file);
@@ -78,7 +84,12 @@ extern int write_netdevs(context_t *ctx);
 extern void free_netdevs(context_t *ctx);
 
 extern int write_socket(context_t *ctx, struct file_struct *file);
+
+extern int read_ifaddr(context_t *ctx);
 extern int write_ifaddr(context_t *ctx);
+extern void free_ifaddr(context_t *ctx);
 extern int write_routes(context_t *ctx);
+
+extern void show_ifaddr_dump(char *file);
 
 #endif /* __CPT2_NET_H__ */

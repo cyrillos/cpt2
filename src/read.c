@@ -253,6 +253,7 @@ void read_fini(context_t *ctx)
 	free_tasks(ctx);
 	free_mm(ctx);
 	free_netdevs(ctx);
+	free_ifaddr(ctx);
 	free_inotify(ctx);
 	free_epolls(ctx);
 }
@@ -281,6 +282,9 @@ int read_dumpfile(context_t *ctx)
 		return -1;
 
 	if (read_netdevs(ctx))
+		return -1;
+
+	if (read_ifaddr(ctx))
 		return -1;
 
 	if (read_files(ctx))

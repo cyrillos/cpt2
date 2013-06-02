@@ -15,6 +15,7 @@
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "libnetlink.h"
 #include "cpt-image.h"
@@ -47,6 +48,7 @@ static DEFINE_HASHTABLE(sock_index_hash, NET_HASH_BITS);
 static DEFINE_HASHTABLE(netdev_hash, NET_HASH_BITS);
 
 static LIST_HEAD(netdev_list);
+static LIST_HEAD(ifaddr_list);
 
 #define PB_ALEN_INET	1
 #define PB_ALEN_INET6	4
@@ -581,86 +583,6 @@ int read_sockets(context_t *ctx)
 	return 0;
 }
 
-int write_ifaddr(context_t *ctx)
-{
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_IFADDR);
-	u32 magic = IFADDR_DUMP_MAGIC;
-	off_t start, end;
-
-	if (write_data(fd, &magic, sizeof(magic))) {
-		pr_err("Failed to write ifaddr magic\n");
-		return -1;
-	}
-
-	pr_read_start("net interface addresses\n");
-	get_section_bounds(ctx, CPT_SECT_NET_IFADDR, &start, &end);
-
-	while (start < end) {
-		struct ifa_cacheinfo ci = { };
-		struct cpt_ifaddr_image v;
-		struct ifaddrmsg *ifm;
-		struct nlmsghdr *nlh;
-		char buf[8192];
-		mslab_t *m;
-
-		if (read_obj_cpt(ctx->fd, CPT_OBJ_NET_IFADDR, &v, start)) {
-			pr_err("Can't read ifaddr object at @%li\n", (long)start);
-			return -1;
-		}
-
-		if (v.cpt_family != PF_INET && v.cpt_family != PF_INET6) {
-			pr_err("Usupported family %u at @%li\n",
-			       (unsigned int)v.cpt_family, (long)start);
-			return -1;
-		}
-
-		if (!netdev_lookup(v.cpt_index)) {
-			pr_err("No net device with index %u at @%li\n",
-			       v.cpt_index, (long)start);
-			return -1;
-		}
-
-		v.cpt_label[sizeof(v.cpt_label) - 1] = '\0';
-		m = mslab_cast(buf, sizeof(buf));
-
-		nlh = nlmsg_put(m, 0, 0, RTM_NEWADDR, sizeof(*ifm), NLM_F_MULTI);
-		BUG_ON(!nlh);
-
-		ifm = nlmsg_data(nlh);
-
-		ifm->ifa_index		= v.cpt_index;
-		ifm->ifa_family		= v.cpt_family;
-		ifm->ifa_prefixlen	= v.cpt_masklen;
-		ifm->ifa_flags		= v.cpt_flags;
-		ifm->ifa_scope		= v.cpt_scope;
-
-		if (v.cpt_family == PF_INET) {
-			nla_put(m, IFA_ADDRESS, sizeof(v.cpt_peer[0]), v.cpt_peer);
-			nla_put(m, IFA_LOCAL, sizeof(v.cpt_address[0]), v.cpt_address);
-			nla_put(m, IFA_BROADCAST, sizeof(v.cpt_broadcast[0]), v.cpt_broadcast);
-			nla_put_string(m, IFA_LABEL, (const char *)v.cpt_label);
-		} else if (v.cpt_family == PF_INET6) {
-			nla_put(m, IFA_ADDRESS, sizeof(v.cpt_peer), v.cpt_peer);
-		}
-
-		ci.ifa_prefered		= v.cpt_prefered_lft;
-		ci.ifa_valid		= v.cpt_valid_lft;
-
-		nla_put(m, IFA_CACHEINFO, sizeof(ci), &ci);
-		nlmsg_end(m, nlh);
-
-		if (write_data(fd, mslab_payload_pointer(m),
-			       mslab_payload_size(m))) {
-			pr_err("Failed to write ifaddrmsg\n");
-			return -1;
-		}
-
-		start += v.cpt_next;
-	}
-
-	return 0;
-}
-
 int write_routes(context_t *ctx)
 {
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
@@ -786,6 +708,138 @@ int read_netdevs(context_t *ctx)
 		 * it since we don't deal with it anyway.
 		 */
 		show_netdev_cont(ctx, dev);
+	}
+	pr_read_end();
+
+	return 0;
+}
+
+void free_ifaddr(context_t *ctx)
+{
+	struct ifaddr_struct *ifa, *t;
+
+	list_for_each_entry_safe(ifa, t, &ifaddr_list, list)
+		obj_free_to(ifa);
+}
+
+int write_ifaddr(context_t *ctx)
+{
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_IFADDR);
+	u32 magic = IFADDR_DUMP_MAGIC;
+	struct ifaddr_struct *ifa;
+
+	if (write_data(fd, &magic, sizeof(magic))) {
+		pr_err("Failed to write ifaddr magic\n");
+		return -1;
+	}
+
+	list_for_each_entry(ifa, &ifaddr_list, list) {
+		struct ifaddrmsg *ifm;
+		struct nlmsghdr *nlh;
+		char buf[8192];
+		mslab_t *m;
+
+		m = mslab_cast(buf, sizeof(buf));
+
+		/*
+		 * FIXME Only "lo" supported at the moment.
+		 */
+		if (strcmp((char *)ifa->ii.cpt_label, "lo")) {
+			pr_warn("Internet address for device %s skipped\n",
+				(char *)ifa->ii.cpt_label);
+			continue;
+		}
+
+		nlh = nlmsg_put(m, 0, 0, RTM_NEWADDR, sizeof(*ifm), NLM_F_MULTI);
+		BUG_ON(!nlh);
+
+		ifm = nlmsg_data(nlh);
+		ifm->ifa_index		= ifa->ii.cpt_index;
+		ifm->ifa_family		= ifa->ii.cpt_family;
+		ifm->ifa_prefixlen	= ifa->ii.cpt_masklen;
+		ifm->ifa_flags		= ifa->ii.cpt_flags;
+		ifm->ifa_scope		= ifa->ii.cpt_scope;
+
+		if (ifa->ii.cpt_family == PF_INET) {
+			nla_put(m, IFA_ADDRESS, sizeof(ifa->ii.cpt_peer[0]), ifa->ii.cpt_peer);
+			nla_put(m, IFA_LOCAL, sizeof(ifa->ii.cpt_address[0]), ifa->ii.cpt_address);
+			nla_put(m, IFA_BROADCAST, sizeof(ifa->ii.cpt_broadcast[0]), ifa->ii.cpt_broadcast);
+			nla_put_string(m, IFA_LABEL, (const char *)ifa->ii.cpt_label);
+		} else if (ifa->ii.cpt_family == PF_INET6) {
+			nla_put(m, IFA_ADDRESS, sizeof(ifa->ii.cpt_peer), ifa->ii.cpt_peer);
+		} else
+			BUG();
+		nlmsg_end(m, nlh);
+
+		/*
+		 * FIXME No IFA_CACHEINFO at moment, do we need it at all?
+		 * It's present in image
+		 */
+
+		if (write_data(fd, mslab_payload_pointer(m),
+			       mslab_payload_size(m))) {
+			pr_err("Failed to write ifaddrmsg\n");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
+{
+	pr_debug("\t@%-8li index %#8x family %#1x masklen %#1x "
+		 "flags %#1x scope %#1x -> %s\n", (long)obj_of(ifa)->o_pos,
+		 ifa->ii.cpt_index, (int)ifa->ii.cpt_family, (int)ifa->ii.cpt_masklen,
+		 (int)ifa->ii.cpt_flags, (int)ifa->ii.cpt_scope, (char *)ifa->ii.cpt_label);
+}
+
+int read_ifaddr(context_t *ctx)
+{
+	off_t start, end;
+
+	pr_read_start("net interface addresses\n");
+	get_section_bounds(ctx, CPT_SECT_NET_IFADDR, &start, &end);
+
+	while (start < end) {
+		struct ifaddr_struct *ifa;
+
+		ifa = obj_alloc_to(struct ifaddr_struct, ii);
+		if (!ifa)
+			return -1;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_NET_IFADDR, &ifa->ii, start)) {
+			pr_err("Can't read netdev object at @%li\n", (long)start);
+			obj_free_to(ifa);
+			return -1;
+		}
+
+		/*
+		 * Check for valid data. Net device must be read already.
+		 */
+		if (ifa->ii.cpt_family != PF_INET &&
+		    ifa->ii.cpt_family != PF_INET6) {
+			pr_err("Usupported family %u at @%li\n",
+			       (unsigned int)ifa->ii.cpt_family, (long)start);
+			obj_free_to(ifa);
+			return -1;
+		}
+
+		if (!netdev_lookup(ifa->ii.cpt_index)) {
+			pr_err("No net device with index %u at @%li\n",
+			       ifa->ii.cpt_index, (long)start);
+			obj_free_to(ifa);
+			return -1;
+		}
+
+		INIT_LIST_HEAD(&ifa->list);
+		obj_set_eos(ifa->ii.cpt_label);
+
+		list_add_tail(&ifa->list, &ifaddr_list);
+
+		start += ifa->ii.cpt_next;
+
+		show_ifaddr_cont(ctx, ifa);
 	}
 	pr_read_end();
 

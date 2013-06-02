@@ -12,6 +12,7 @@
 #include "convert.h"
 #include "cpt2.h"
 #include "log.h"
+#include "net.h"
 
 #include "res/vdso-rhel.h"
 
@@ -65,6 +66,9 @@ int main(int argc, char *argv[])
 
 	if (!global_opts.cpt_filename)
 		goto usage;
+
+//	show_ifaddr_dump(global_opts.cpt_filename);
+//	exit(0);
 
 	if (!global_opts.root_dirname)
 		goto usage;
