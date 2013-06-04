@@ -15,17 +15,11 @@
 
 #include "res/vdso-rhel.h"
 
-opts_t global_opts = {
-	.loglevel = DEFAULT_LOGLEVEL,
-};
-
-unsigned int loglevel_get(void)
-{
-	return global_opts.loglevel;
-}
+opts_t global_opts;
 
 int main(int argc, char *argv[])
 {
+	unsigned int loglevel = DEFAULT_LOGLEVEL;
 	int opt, idx;
 
 	const char short_opts[] = "f:D:r:v";
@@ -56,19 +50,18 @@ int main(int argc, char *argv[])
 				char *opt = argv[optind];
 
 				if (isdigit(*opt)) {
-					global_opts.loglevel = atoi(opt);
+					loglevel = atoi(opt);
 					optind++;
 				} else
-					global_opts.loglevel++;
+					loglevel++;
 			} else
-				global_opts.loglevel++;
+				loglevel++;
 		default:
 			break;
 		}
 	}
 
-	global_opts.loglevel = max(global_opts.loglevel,
-				   (unsigned int)DEFAULT_LOGLEVEL);
+	loglevel_set(max(loglevel, (unsigned int)DEFAULT_LOGLEVEL));
 
 	if (!global_opts.cpt_filename)
 		goto usage;

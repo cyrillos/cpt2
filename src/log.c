@@ -16,7 +16,23 @@
 #include "types.h"
 #include "log.h"
 
+static unsigned int current_loglevel = DEFAULT_LOGLEVEL;
 static char logbuf[PAGE_SIZE];
+
+void loglevel_set(unsigned int loglevel)
+{
+	current_loglevel = loglevel;
+}
+
+unsigned int loglevel_get(void)
+{
+	return current_loglevel;
+}
+
+bool wont_print(unsigned int loglevel)
+{
+	return loglevel != LOG_MSG && loglevel > loglevel_get();
+}
 
 static void __print_on_level(unsigned int loglevel, const char *format, va_list params)
 {
@@ -30,7 +46,7 @@ void print_on_level(unsigned int loglevel, const char *format, ...)
 {
 	va_list params;
 
-	if (loglevel != LOG_MSG && loglevel > loglevel_get())
+	if (wont_print(loglevel))
 		return;
 
 	va_start(params, format);
