@@ -67,9 +67,6 @@ int main(int argc, char *argv[])
 	if (!global_opts.cpt_filename)
 		goto usage;
 
-//	show_ifaddr_dump(global_opts.cpt_filename);
-//	exit(0);
-
 	if (!global_opts.root_dirname)
 		goto usage;
 
