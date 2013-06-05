@@ -90,6 +90,4 @@ extern int write_ifaddr(context_t *ctx);
 extern void free_ifaddr(context_t *ctx);
 extern int write_routes(context_t *ctx);
 
-extern void show_ifaddr_dump(char *file);
-
 #endif /* __CPT2_NET_H__ */
