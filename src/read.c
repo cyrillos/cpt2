@@ -10,6 +10,7 @@
 #include "fsnotify.h"
 #include "context.h"
 #include "xmalloc.h"
+#include "timers.h"
 #include "files.h"
 #include "epoll.h"
 #include "read.h"
@@ -238,6 +239,11 @@ static int read_headers(context_t *ctx)
 	show_headers_cont(ctx);
 	pr_read_end();
 
+	/*
+	 * Don't forget to update HZ, will need it for itimers conversion.
+	 */
+	image_HZ = ctx->h.cpt_hz;
+
 	return 0;
 }
 
@@ -251,6 +257,7 @@ void read_fini(context_t *ctx)
 	free_ttys(ctx);
 	free_inodes(ctx);
 	free_tasks(ctx);
+	free_timers(ctx);
 	free_mm(ctx);
 	free_netdevs(ctx);
 	free_ifaddr(ctx);
@@ -297,6 +304,9 @@ int read_dumpfile(context_t *ctx)
 		return -1;
 
 	if (read_tasks(ctx))
+		return -1;
+
+	if (read_timers(ctx))
 		return -1;
 
 	if (read_mm(ctx))

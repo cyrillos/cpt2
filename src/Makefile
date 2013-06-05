@@ -19,6 +19,7 @@ obj-y	+= fsnotify.o
 obj-y	+= sig.o
 obj-y	+= epoll.o
 obj-y	+= libnetlink.o
+obj-y	+= timers.o
 
 cflags-y += -iquote include
 

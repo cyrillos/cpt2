@@ -10,6 +10,7 @@
 #include "cpt-image.h"
 #include "hashtable.h"
 #include "xmalloc.h"
+#include "timers.h"
 #include "image.h"
 #include "files.h"
 #include "read.h"
@@ -24,7 +25,6 @@
 
 #include "protobuf.h"
 #include "protobuf/pstree.pb-c.h"
-#include "protobuf/itimer.pb-c.h"
 #include "protobuf/creds.pb-c.h"
 #include "protobuf/core.pb-c.h"
 #include "protobuf/sa.pb-c.h"
@@ -369,43 +369,6 @@ out:
 	return ret;
 }
 
-static int write_task_itimers(context_t *ctx, struct task_struct *t)
-{
-	int ret = 0, fd = -1;
-	ItimerEntry ie;
-
-	fd = open_image(ctx, CR_FD_ITIMERS, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
-
-	/*
-	 * FIXME
-	 *
-	 * No real data yet
-	 */
-
-	/* real */
-	itimer_entry__init(&ie);
-	ret = pb_write_one(fd, &ie, PB_ITIMERS);
-	if (ret)
-		goto err;
-
-	/* virt */
-	itimer_entry__init(&ie);
-	ret = pb_write_one(fd, &ie, PB_ITIMERS);
-	if (ret)
-		goto err;
-
-	/* prof */
-	itimer_entry__init(&ie);
-	ret = pb_write_one(fd, &ie, PB_ITIMERS);
-	if (ret)
-		goto err;
-err:
-	close_safe(&fd);
-	return ret;
-}
-
 static int write_task_creds(context_t *ctx, struct task_struct *t)
 {
 	CredsEntry ce = CREDS_ENTRY__INIT;
@@ -560,9 +523,9 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 		goto out;
 	}
 
-	ret = write_task_itimers(ctx, t);
+	ret = write_timers(ctx, t);
 	if (ret) {
-		pr_err("Failed writing itimers for task %d\n",
+		pr_err("Failed writing timers for task %d\n",
 		       t->ti.cpt_pid);
 		goto out;
 	}
