@@ -110,7 +110,7 @@ static int write_itimers(context_t *ctx, struct task_struct *t)
 	itimer_entry__init(&ie);
 
 	cputime_to_timeval(t->ti.cpt_it_virt_value, &tv.it_value);
-	cputime_to_timeval(t->ti.cpt_it_virt_incr, &tv.it_value);
+	cputime_to_timeval(t->ti.cpt_it_virt_incr, &tv.it_interval);
 
 	ie.isec		= tv.it_interval.tv_sec;
 	ie.iusec	= tv.it_interval.tv_usec;
@@ -124,7 +124,7 @@ static int write_itimers(context_t *ctx, struct task_struct *t)
 	itimer_entry__init(&ie);
 
 	cputime_to_timeval(t->ti.cpt_it_prof_value, &tv.it_value);
-	cputime_to_timeval(t->ti.cpt_it_prof_incr, &tv.it_value);
+	cputime_to_timeval(t->ti.cpt_it_prof_incr, &tv.it_interval);
 
 	ie.isec		= tv.it_interval.tv_sec;
 	ie.iusec	= tv.it_interval.tv_usec;
