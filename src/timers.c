@@ -37,51 +37,6 @@ int read_timers(context_t *ctx)
 	return 0;
 }
 
-#if 0
-	if (thread_group_leader(tsk) && tsk->exit_state == 0) {
-		ktime_t rem;
-
-		v->cpt_it_real_incr = ktime_to_ns(tsk->signal->it_real_incr);
-		v->cpt_it_prof_incr = tsk->signal->it[CPUCLOCK_PROF].incr;
-		v->cpt_it_virt_incr = tsk->signal->it[CPUCLOCK_VIRT].incr;
-
-		rem = hrtimer_get_remaining(&tsk->signal->real_timer);
-
-		if (hrtimer_active(&tsk->signal->real_timer)) {
-			if (rem.tv64 <= 0)
-				rem.tv64 = NSEC_PER_USEC;
-			v->cpt_it_real_value = ktime_to_ns(rem);
-			dprintk("cpt itimer " CPT_FID " %Lu\n", CPT_TID(tsk), (unsigned long long)v->cpt_it_real_value);
-		}
-		v->cpt_it_prof_value = tsk->signal->it[CPUCLOCK_PROF].expires;
-		v->cpt_it_virt_value = tsk->signal->it[CPUCLOCK_VIRT].expires;
-	}
-
-int do_getitimer(int which, struct itimerval *value)
-{
-	struct task_struct *tsk = current;
-
-	switch (which) {
-	case ITIMER_REAL:
-		spin_lock_irq(&tsk->sighand->siglock);
-		value->it_value = itimer_get_remtime(&tsk->signal->real_timer);
-		value->it_interval =
-			ktime_to_timeval(tsk->signal->it_real_incr);
-		spin_unlock_irq(&tsk->sighand->siglock);
-		break;
-	case ITIMER_VIRTUAL:
-		get_cpu_itimer(tsk, CPUCLOCK_VIRT, value);
-		break;
-	case ITIMER_PROF:
-		get_cpu_itimer(tsk, CPUCLOCK_PROF, value);
-		break;
-	default:
-		return(-EINVAL);
-	}
-	return 0;
-}
-#endif
-
 static int write_itimers(context_t *ctx, struct task_struct *t)
 {
 	int ret = -1, fd = -1;
