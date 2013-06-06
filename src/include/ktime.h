@@ -11,20 +11,15 @@
 extern u16 image_HZ;
 #define HZ					image_HZ
 
-#define MSEC_PER_SEC		1000L
-#define USEC_PER_MSEC		1000L
-#define NSEC_PER_USEC		1000L
-#define NSEC_PER_MSEC		1000000L
-#define USEC_PER_SEC		1000000L
-#define NSEC_PER_SEC		1000000000L
-#define FSEC_PER_SEC		1000000000000000L
+#define NSEC_PER_USEC				1000L
+#define NSEC_PER_SEC				1000000000L
 
 #define cputime_to_timeval(__ct,__val)		jiffies_to_timeval(__ct,__val)
 
 #define SH_DIV(nom, den, lsh)			\
 	((((nom) / (den)) << (lsh)) + ((((nom) % (den)) << (lsh)) + (den) / 2) / (den))
 
-#define PIT_TICK_RATE				1193182ul
+#define PIT_TICK_RATE				1193182UL
 #define CLOCK_TICK_RATE				PIT_TICK_RATE
 
 #define LATCH					((CLOCK_TICK_RATE + HZ / 2) / HZ)
