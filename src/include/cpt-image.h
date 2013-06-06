@@ -1337,8 +1337,8 @@ struct cpt_task_image {
 	__u8				cpt_comm[16];
 	__u64				cpt_tls[3];
 	struct cpt_restart_block	cpt_restart;
-	__u64				cpt_it_real_value;
-	__u64				cpt_it_real_incr;
+	__u64				cpt_it_real_value;	/* V8: jiffies, V9..: nsec */
+	__u64				cpt_it_real_incr;	/* V8: jiffies, V9..: nsec */
 	__u64				cpt_it_prof_value;
 	__u64				cpt_it_prof_incr;
 	__u64				cpt_it_virt_value;
