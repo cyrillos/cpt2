@@ -130,7 +130,7 @@ all: $(PROGRAM)
 tags:
 	$(E) "  GEN" $@
 	$(Q) $(RM) tags
-	$(Q) $(FIND) -L . -name '*.[hcS]' ! -path './.*' -print | xargs ctags -a
+	$(Q) $(FIND) -L . $(CRIUDIR)/include $(CRIUDIR)/arch/$(ARCH)/include $(CRIUDIR)/protobuf -name '*.[hcS]' ! -path './.*' -print | xargs ctags -a
 
 clean:
 	$(E) "  CLEAN"
