@@ -455,6 +455,42 @@ static void show_file_cont(context_t *ctx, struct file_struct *file)
 		}
 		pr_debug("\n");
 	}
+
+	if (file->sprig) {
+		switch (file->sprig->u.hdr.cpt_object) {
+		case CPT_OBJ_TIMERFD:
+			pr_debug("\t\t\t\t@%-8li timerfd"
+				 "\t\t\t\t\tit_value %-8li it_interval %-8li\n"
+				 "\t\t\t\t\tticks %-8li expired %-4i clockid %-4i\n",
+				 (long)obj_of(file->sprig)->o_pos,
+				 (long)file->sprig->u.tfi.cpt_it_value,
+				 (long)file->sprig->u.tfi.cpt_it_interval,
+				 (long)file->sprig->u.tfi.cpt_ticks,
+				 file->sprig->u.tfi.cpt_expired,
+				 file->sprig->u.tfi.cpt_clockid);
+		case CPT_OBJ_EVENTFD:
+			pr_debug("\t\t\t\t@%-8li eventfd"
+				 "\t\t\t\t\tcount %-8li flags %-4i\n",
+				 (long)obj_of(file->sprig)->o_pos,
+				 (long)file->sprig->u.efi.cpt_count,
+				 file->sprig->u.efi.cpt_flags);
+		case CPT_OBJ_FLOCK:
+			pr_debug("\t\t\t\t@%-8li flock"
+				 "\t\t\t\t\towner %-4i pid %-4i\n"
+				 "\t\t\t\t\tstart %-8li end %-8li flags %-4i\n"
+				 "\t\t\t\t\ttype %-4i svid %-4i",
+				 (long)obj_of(file->sprig)->o_pos,
+				 file->sprig->u.fli.cpt_owner,
+				 file->sprig->u.fli.cpt_pid,
+				 (long)file->sprig->u.fli.cpt_start,
+				 (long)file->sprig->u.fli.cpt_end,
+				 file->sprig->u.fli.cpt_flags,
+				 file->sprig->u.fli.cpt_type,
+				 file->sprig->u.fli.cpt_svid);
+		default:
+			BUG();
+		}
+	}
 }
 
 static void free_one_file(struct file_struct *file)
