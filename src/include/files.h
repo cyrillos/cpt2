@@ -14,11 +14,21 @@
 
 struct task_struct;
 
+struct file_sprig_struct {
+	union {
+	  struct cpt_object_hdr		hdr;
+	  struct cpt_timerfd_image	tfi;
+	  struct cpt_eventfd_image	efi;
+	  struct cpt_flock_image	fli;
+	} u;
+};
+
 struct file_struct {
 	bool				dumped;
 	char				*name;
 
 	struct cpt_file_image		fi;
+	struct file_sprig_struct	*sprig;
 };
 
 struct files_struct {

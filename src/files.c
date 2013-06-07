@@ -457,9 +457,23 @@ static void show_file_cont(context_t *ctx, struct file_struct *file)
 	}
 }
 
+static void free_one_file(struct file_struct *file)
+{
+	if (file) {
+		if (likely(!IS_ERR(file->name)))
+			xfree(file->name);
+		if (file->sprig) {
+			obj_unhash_to(file->sprig);
+			obj_free_to(file->sprig);
+		}
+		obj_free_to(file);
+	}
+}
+
 static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 {
-	struct file_struct *file;
+	struct file_struct *file, *ret = NULL;
+	off_t at;
 
 	file = obj_alloc_to(struct file_struct, fi);
 	if (!file)
@@ -467,17 +481,13 @@ static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 
 	file->name = NULL;
 	file->dumped = false;
+	file->sprig = NULL;
 
-	if (read_obj_cpt(ctx->fd, CPT_OBJ_FILE, &file->fi, start)) {
-		obj_free_to(file);
-		pr_err("Can't read file object at @%li\n", (long)start);
-		return NULL;
-	}
-
-	obj_push_hash_to(file, CPT_OBJ_FILE, start);
-	*next = start + file->fi.cpt_next;
+	if (read_obj_cpt(ctx->fd, CPT_OBJ_FILE, &file->fi, start))
+		goto err;
 
 	if (file->fi.cpt_next > file->fi.cpt_hdrlen) {
+		off_t off;
 
 		/*
 		 * Some underlied data present, which might be one of
@@ -485,15 +495,66 @@ static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 		 * (CPT_OBJ_TIMERFD | CPT_OBJ_EVENTFD | CPT_OBJ_FLOCK)
 		 */
 		if (!S_ISSOCK(file->fi.cpt_i_mode)) {
-			file->name = read_name(ctx->fd, obj_of(file)->o_pos + file->fi.cpt_hdrlen, NULL);
-			if (IS_ERR(file->name)) {
-				obj_free_to(file);
-				return NULL;
+			at = obj_of(file)->o_pos + file->fi.cpt_hdrlen;
+			file->name = read_name(ctx->fd, at, &off);
+			if (IS_ERR(file->name))
+				goto err;
+		}
+
+		if (off < file->fi.cpt_next) {
+			struct file_sprig_struct *sprig;
+
+			sprig = obj_alloc_to(struct file_sprig_struct, u);
+			if (!sprig)
+				goto err;
+
+			at = obj_of(file)->o_pos + file->fi.cpt_hdrlen + off;
+			if (read_obj_hdr(ctx->fd, &sprig->u.hdr, at)) {
+				obj_free_to(sprig);
+				pr_err("Failed to read undelied header\n");
+				goto err;
 			}
+
+			switch (sprig->u.hdr.cpt_object) {
+			case CPT_OBJ_TIMERFD:
+				if (read_obj_cpt_cont(ctx->fd, &sprig->u.tfi)) {
+					obj_free_to(sprig);
+					pr_err("Failed to read timerfd\n");
+					goto err;
+				}
+			case CPT_OBJ_EVENTFD:
+				if (read_obj_cpt_cont(ctx->fd, &sprig->u.tfi)) {
+					obj_free_to(sprig);
+					pr_err("Failed to read eventfd\n");
+					goto err;
+				}
+			case CPT_OBJ_FLOCK:
+				if (read_obj_cpt_cont(ctx->fd, &sprig->u.tfi)) {
+					obj_free_to(sprig);
+					pr_err("Failed to read flock\n");
+					goto err;
+				}
+			default:
+				obj_free_to(sprig);
+				pr_err("Unknown underlied object\n");
+				goto err;
+			}
+
+			obj_hash_typed_to(sprig, sprig->u.hdr.cpt_object, at);
+			file->sprig = sprig;
 		}
 	}
 
-	return file;
+	obj_push_hash_to(file, CPT_OBJ_FILE, start);
+	*next = start + file->fi.cpt_next;
+
+	ret = file;
+	file = NULL;
+err:
+	if (file)
+		pr_err("Failed to read file at @%li\n", (long)start);
+	free_one_file(file);
+	return ret;
 }
 
 void free_files(context_t *ctx)
@@ -502,10 +563,8 @@ void free_files(context_t *ctx)
 	struct file_struct *file;
 	struct fd_struct *fd, *n;
 
-	while ((file = obj_pop_unhash_to(CPT_OBJ_FILE))) {
-		xfree(file->name);
-		obj_free_to(file);
-	}
+	while ((file = obj_pop_unhash_to(CPT_OBJ_FILE)))
+		free_one_file(file);
 
 	while ((files = obj_pop_unhash_to(CPT_OBJ_FILES))) {
 		list_for_each_entry_safe(fd, n, &files->fd_list, list) {
