@@ -10,6 +10,7 @@
 #include "cpt-image.h"
 #include "fsnotify.h"
 #include "signalfd.h"
+#include "compiler.h"
 #include "magicfs.h"
 #include "xmalloc.h"
 #include "files.h"
@@ -29,6 +30,35 @@
 #include "protobuf/regfile.pb-c.h"
 #include "protobuf/pipe.pb-c.h"
 #include "protobuf/fs.pb-c.h"
+
+#define __gen_lflag_entry(postfix)			\
+	{						\
+		.name	= __stringify_1(postfix),	\
+		.flag	= CPT_DENTRY_ ##postfix,	\
+	}
+
+static struct {
+	char	*name;
+	int	flag;
+} file_lflags_map[] = {
+	__gen_lflag_entry(DELETED),
+	__gen_lflag_entry(ROOT),
+	__gen_lflag_entry(CLONING),
+	__gen_lflag_entry(PROC),
+	__gen_lflag_entry(EPOLL),
+	__gen_lflag_entry(REPLACED),
+	__gen_lflag_entry(INOTIFY),
+	__gen_lflag_entry(FUTEX),
+	__gen_lflag_entry(TUNTAP),
+	__gen_lflag_entry(PROCPID_DEAD),
+	__gen_lflag_entry(HARDLINKED),
+	__gen_lflag_entry(SIGNALFD),
+	__gen_lflag_entry(TIMERFD),
+	__gen_lflag_entry(EVENTFD),
+	__gen_lflag_entry(SILLYRENAME),
+};
+
+#undef __gen_lflag_entry
 
 static int get_file_type(FdinfoEntry *e, struct file_struct *file)
 {
@@ -409,12 +439,22 @@ int read_inodes(context_t *ctx)
 
 static void show_file_cont(context_t *ctx, struct file_struct *file)
 {
+	unsigned int i;
+
 	pr_debug("\t@%-8li flags %8d mode %6d pos %16li\n"
 		 "\t\ti_mode %6d lflags %6d inode @%-8li vfsmount @%-8li --> %s\n",
 		(long)obj_of(file)->o_pos, file->fi.cpt_flags, file->fi.cpt_mode,
 		(long)file->fi.cpt_pos, file->fi.cpt_i_mode,
 		file->fi.cpt_lflags, (long)file->fi.cpt_inode,
 		(long)file->fi.cpt_vfsmount, file->name);
+	if (file->fi.cpt_lflags) {
+		pr_debug("\t\t\t");
+		for (i = 0; i < ARRAY_SIZE(file_lflags_map); i++) {
+			if (file->fi.cpt_lflags & file_lflags_map[i].flag)
+				pr_debug("%s ", file_lflags_map[i].name);
+		}
+		pr_debug("\n");
+	}
 }
 
 static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
