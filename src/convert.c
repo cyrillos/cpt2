@@ -84,7 +84,6 @@ static int write_stubs(context_t *ctx)
 		close(fd);					\
 	} while (0)
 
-	gen_stub(EVENTFD);
 	gen_stub(FANOTIFY);
 	gen_stub(FANOTIFY_MARK);
 	gen_stub(PIPES_DATA);

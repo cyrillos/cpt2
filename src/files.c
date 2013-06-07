@@ -28,6 +28,7 @@
 #include "protobuf/fdinfo.pb-c.h"
 #include "protobuf/signalfd.pb-c.h"
 #include "protobuf/regfile.pb-c.h"
+#include "protobuf/eventfd.pb-c.h"
 #include "protobuf/pipe.pb-c.h"
 #include "protobuf/fs.pb-c.h"
 
@@ -285,6 +286,32 @@ static int write_signalfd(context_t *ctx, struct file_struct *file)
 	return ret;
 }
 
+static int write_eventfd(context_t *ctx, struct file_struct *file)
+{
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_EVENTFD);
+	EventfdFileEntry e = EVENTFD_FILE_ENTRY__INIT;
+	FownEntry fown = FOWN_ENTRY__INIT;
+	int ret = -1;
+
+	if (file->dumped)
+		return 0;
+
+	BUG_ON(!file->sprig);
+
+	fill_fown(&fown, file);
+
+	e.id		= obj_id_of(file);
+	e.flags		= file->fi.cpt_flags;
+	e.fown		= &fown;
+	e.counter	= file->sprig->u.efi.cpt_count;
+
+	ret = pb_write_one(fd, &e, PB_EVENTFD);
+	if (!ret)
+		file->dumped = true;
+
+	return ret;
+}
+
 int write_task_files(context_t *ctx, struct task_struct *t)
 {
 	FdinfoEntry e = FDINFO_ENTRY__INIT;
@@ -371,6 +398,9 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 			break;
 		case FD_TYPES__SIGNALFD:
 			ret = write_signalfd(ctx, file);
+			break;
+		case FD_TYPES__EVENTFD:
+			ret = write_eventfd(ctx, file);
 			break;
 		default:
 			pr_err("Unsupported file found (type = %d)\n", e.type);
