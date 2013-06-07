@@ -438,10 +438,18 @@ static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 	*next = start + file->fi.cpt_next;
 
 	if (file->fi.cpt_next > file->fi.cpt_hdrlen) {
-		file->name = read_name(ctx->fd, obj_of(file)->o_pos + file->fi.cpt_hdrlen, NULL);
-		if (IS_ERR(file->name)) {
-			obj_free_to(file);
-			return NULL;
+
+		/*
+		 * Some underlied data present, which might be one of
+		 * CPT_OBJ_NAME (for non socket files) and then
+		 * (CPT_OBJ_TIMERFD | CPT_OBJ_EVENTFD | CPT_OBJ_FLOCK)
+		 */
+		if (!S_ISSOCK(file->fi.cpt_i_mode)) {
+			file->name = read_name(ctx->fd, obj_of(file)->o_pos + file->fi.cpt_hdrlen, NULL);
+			if (IS_ERR(file->name)) {
+				obj_free_to(file);
+				return NULL;
+			}
 		}
 	}
 
