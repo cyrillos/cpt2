@@ -63,6 +63,34 @@ static struct {
 
 static int get_file_type(FdinfoEntry *e, struct file_struct *file)
 {
+	u32 lflags = file->fi.cpt_lflags;
+
+	/*
+	 * At first look at local flags.
+	 */
+	if (lflags & CPT_DENTRY_EPOLL) {
+		e->type = FD_TYPES__EVENTPOLL;
+		return 0;
+	} else if (lflags & CPT_DENTRY_INOTIFY) {
+		e->type = FD_TYPES__INOTIFY;
+		return 0;
+	} else if (lflags & CPT_DENTRY_SIGNALFD) {
+		e->type = FD_TYPES__SIGNALFD;
+		return 0;
+	} else if (lflags & CPT_DENTRY_TIMERFD) {
+		pr_err("Unsupported timerfd file\n");
+		return -1;
+	} else if (lflags & CPT_DENTRY_EVENTFD) {
+		e->type = FD_TYPES__EVENTFD;
+		return 0;
+	}
+
+	/*
+	 * In most cases the upper code should handle all
+	 * possible data, still if failed, lets deal with
+	 * a name.
+	 */
+
 	if (!file->name)
 		return -1;
 
