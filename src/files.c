@@ -27,6 +27,7 @@
 #include "protobuf.h"
 #include "protobuf/fdinfo.pb-c.h"
 #include "protobuf/signalfd.pb-c.h"
+#include "protobuf/file-lock.pb-c.h"
 #include "protobuf/regfile.pb-c.h"
 #include "protobuf/eventfd.pb-c.h"
 #include "protobuf/pipe.pb-c.h"
@@ -340,11 +341,37 @@ static int write_eventfd(context_t *ctx, struct file_struct *file)
 	return ret;
 }
 
+static int write_flock(context_t *ctx, struct file_struct *file,
+		       struct fd_struct *fd, int image_fd)
+{
+	struct file_sprig_struct *sprig = file->sprig;
+	FileLockEntry e = FILE_LOCK_ENTRY__INIT;
+
+	if (file->dumped || !sprig)
+		return 0;
+
+	if (sprig->u.hdr.cpt_object != CPT_OBJ_FLOCK)
+		return 0;
+
+	/*
+	 * FIXME What with @cpt_svid ?
+	 */
+	e.flag	= sprig->u.fli.cpt_flags;
+	e.type	= sprig->u.fli.cpt_type;
+	e.pid	= sprig->u.fli.cpt_pid;
+	e.fd	= fd->fdi.cpt_fd;
+	e.start	= sprig->u.fli.cpt_start;
+	e.len	= sprig->u.fli.cpt_end - sprig->u.fli.cpt_start;
+
+	return pb_write_one(image_fd, &e, PB_FILE_LOCK);
+}
+
 int write_task_files(context_t *ctx, struct task_struct *t)
 {
 	FdinfoEntry e = FDINFO_ENTRY__INIT;
 	struct files_struct *files;
 	struct fd_struct *fd;
+	int image_flock = -1;
 	int image_fd = -1;
 	int ret = -1;
 
@@ -366,6 +393,10 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 
 	image_fd = open_image(ctx, CR_FD_FDINFO, O_DUMP, t->ti.cpt_pid);
 	if (image_fd < 0)
+		goto out;
+
+	image_flock = open_image(ctx, CR_FD_FILE_LOCKS, O_DUMP, t->ti.cpt_pid);
+	if (image_flock < 0)
 		goto out;
 
 	list_for_each_entry(fd, &files->fd_list, list) {
@@ -400,6 +431,14 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 		e.fd	= fd->fdi.cpt_fd;
 
 		ret = pb_write_one(image_fd, &e, PB_FDINFO);
+		if (ret)
+			goto out;
+
+		/*
+		 * Associated file lock must be written earlier
+		 * than anything else (we check for @dumped flag).
+		 */
+		ret = write_flock(ctx, file, fd, image_flock);
 		if (ret)
 			goto out;
 
@@ -442,6 +481,7 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 	ret = 0;
 out:
 	close_safe(&image_fd);
+	close_safe(&image_flock);
 	return ret;
 }
 
