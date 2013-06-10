@@ -176,7 +176,7 @@ static int fill_socket_opts(context_t *ctx,
 	return 0;
 }
 
-static struct cpt_inode_image *socket_inode(struct sock_struct *sk)
+static struct inode_struct *socket_inode(struct sock_struct *sk)
 {
 	struct file_struct *file;
 
@@ -187,7 +187,7 @@ static struct cpt_inode_image *socket_inode(struct sock_struct *sk)
 	if (file) {
 		if (file->fi.cpt_inode == -1)
 			return NULL;
-		return obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+		return obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	}
 
 	return NULL;
@@ -204,7 +204,7 @@ static int write_unix_socket(context_t *ctx,
 
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_UNIXSK);
 
-	struct cpt_inode_image *inode, *peer_inode;
+	struct inode_struct *inode, *peer_inode;
 	struct sock_struct *peer;
 	int ret = -1;
 
@@ -216,7 +216,7 @@ static int write_unix_socket(context_t *ctx,
 		return -1;
 	}
 
-	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode @%li for file at @%li\n",
 		       (long)file->fi.cpt_inode, obj_pos_of(file));
@@ -255,7 +255,7 @@ static int write_unix_socket(context_t *ctx,
 	}
 
 	ue.id			= obj_id_of(file);
-	ue.ino			= inode->cpt_ino;
+	ue.ino			= inode->ii.cpt_ino;
 	ue.type			= sk->si.cpt_type;
 	ue.state		= sk->si.cpt_state;
 
@@ -264,7 +264,7 @@ static int write_unix_socket(context_t *ctx,
 	/* FIXME This is valid for TCP_LISTEN only */
 	ue.backlog		= sk->si.cpt_max_ack_backlog;
 
-	ue.peer			= peer_inode ? peer_inode->cpt_ino : 0;
+	ue.peer			= peer_inode ? peer_inode->ii.cpt_ino : 0;
 	ue.fown			= &fown;
 	ue.opts			= &skopts;
 	ue.uflags		= 0;
@@ -315,14 +315,14 @@ static int write_inet_socket(context_t *ctx,
 
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_INETSK);
 
-	struct cpt_inode_image *inode;
+	struct inode_struct *inode;
 	void *src, *dst;
 	int ret = -1;
 
 	if (file->dumped)
 		return 0;
 
-	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode @%li for file at @%li\n",
 		       (long)file->fi.cpt_inode, obj_pos_of(file));
@@ -332,7 +332,7 @@ static int write_inet_socket(context_t *ctx,
 	fill_fown(&fown, file);
 
 	ie.id		= obj_id_of(file);
-	ie.ino		= inode->cpt_ino;
+	ie.ino		= inode->ii.cpt_ino;
 	ie.family	= sk->si.cpt_family;
 	ie.proto	= sk->si.cpt_protocol;
 	ie.type		= sk->si.cpt_type;
@@ -421,13 +421,13 @@ static int write_netlink_socket(context_t *ctx,
 
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_NETLINKSK);
 
-	struct cpt_inode_image *inode;
+	struct inode_struct *inode;
 	int ret = -1;
 
 	if (file->dumped)
 		return 0;
 
-	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode @%li for file at @%li\n",
 		       (long)file->fi.cpt_inode, obj_pos_of(file));
@@ -437,7 +437,7 @@ static int write_netlink_socket(context_t *ctx,
 	fill_fown(&fown, file);
 
 	ne.id		= obj_id_of(file);
-	ne.ino		= inode->cpt_ino;
+	ne.ino		= inode->ii.cpt_ino;
 	ne.protocol	= sk->si.cpt_protocol;
 
 	/*

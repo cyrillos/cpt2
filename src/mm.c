@@ -123,7 +123,7 @@ static u32 vma_flags_to_prot(u64 flags)
 		_calc_vm_trans(flags, VM_EXECUTABLE,	PROT_EXEC);
 }
 
-static bool is_dev_zero(struct cpt_inode_image *inode, struct file_struct *file)
+static bool is_dev_zero(struct inode_struct *inode, struct file_struct *file)
 {
 //	if (!inode || inode->cpt_sb != TMPFS_MAGIC || !file->name)
 //		return false;
@@ -740,7 +740,7 @@ static void show_vma_cont(context_t *ctx, struct vma_struct *vma)
 static int vma_parse(context_t *ctx, struct mm_struct *mm,
 		     struct vma_struct *vma)
 {
-	struct cpt_inode_image *inode = NULL;
+	struct inode_struct *inode = NULL;
 	struct file_struct *file = NULL;
 
 	if (vma->vmai.cpt_file != -1) {
@@ -749,7 +749,7 @@ static int vma_parse(context_t *ctx, struct mm_struct *mm,
 			goto err;
 
 		if (file->fi.cpt_inode != -1) {
-			inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+			inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 			if (!inode)
 				goto err;
 		}

@@ -50,6 +50,14 @@ struct fs_struct {
 	struct cpt_fs_struct_image	fsi;
 };
 
+struct inode_struct {
+	union {
+		bool			dumped_pipe;
+	} u;
+
+	struct cpt_inode_image		ii;
+};
+
 extern int read_files(context_t *ctx);
 extern int write_task_files(context_t *ctx, struct task_struct *t);
 extern void free_files(context_t *ctx);

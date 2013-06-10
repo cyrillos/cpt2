@@ -121,7 +121,7 @@ static int get_file_type(FdinfoEntry *e, struct file_struct *file)
 }
 
 static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
-			   struct cpt_inode_image *inode)
+			   struct inode_struct *inode)
 {
 
 	/*
@@ -166,7 +166,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 			       (long)obj_of(file)->o_pos);
 			return -1;
 		}
-		switch (kdev_major(inode->cpt_rdev)) {
+		switch (kdev_major(inode->ii.cpt_rdev)) {
 		case MEM_MAJOR:
 			e->type = FD_TYPES__REG;
 			break;
@@ -177,7 +177,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 			break;
 		default:
 			pr_err("Character file with maj %d inode at @%li\n",
-			       major(inode->cpt_rdev), (long)obj_of(file)->o_pos);
+			       major(inode->ii.cpt_rdev), (long)obj_of(file)->o_pos);
 			return -1;
 		}
 	} else if (S_ISDIR(file->fi.cpt_i_mode)) {
@@ -188,7 +188,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 			       (long)obj_of(file)->o_pos);
 			return -1;
 		}
-		if (inode->cpt_sb == PIPEFS_MAGIC)
+		if (inode->ii.cpt_sb == PIPEFS_MAGIC)
 			e->type = FD_TYPES__PIPE;
 		else
 			e->type = FD_TYPES__FIFO;
@@ -252,7 +252,7 @@ int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 }
 
 static int write_pipe_data(context_t *ctx, struct file_struct *file,
-			   struct cpt_inode_image *inode, bool is_pipe)
+			   struct inode_struct *inode, bool is_pipe)
 {
 	int fd = fdset_fd(ctx->fdset_glob, is_pipe ? CR_FD_PIPES_DATA : CR_FD_FIFO_DATA);
 	obj_t *obj = obj_of(inode);
@@ -269,7 +269,7 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	/*
 	 * No underlied data.
 	 */
-	if (inode->cpt_next == inode->cpt_hdrlen)
+	if (inode->ii.cpt_next == inode->ii.cpt_hdrlen)
 		return 0;
 
 	/*
@@ -277,7 +277,7 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	 *	 duplication of data writen.
 	 */
 
-	start = obj->o_pos + inode->cpt_hdrlen;
+	start = obj->o_pos + inode->ii.cpt_hdrlen;
 
 	if (read_obj_hdr(ctx->fd, &u.h, start)) {
 		pr_err("Failed to read object header at @%li\n",
@@ -330,7 +330,7 @@ static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_PIPES);
 	PipeEntry pe = PIPE_ENTRY__INIT;
 	FownEntry fown = FOWN_ENTRY__INIT;
-	struct cpt_inode_image *inode;
+	struct inode_struct *inode;
 	int ret = -1;
 
 	if (file->dumped)
@@ -341,7 +341,7 @@ static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 		return -1;
 	}
 
-	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode for pipe on file @%li\n",
 		       (long)obj_of(file)->o_pos);
@@ -369,7 +369,7 @@ static int write_fifo_entry(context_t *ctx, struct file_struct *file)
 {
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_FIFO);
 	FifoEntry fe = FIFO_ENTRY__INIT;
-	struct cpt_inode_image *inode;
+	struct inode_struct *inode;
 	int ret = -1;
 
 	if (file->dumped)
@@ -387,7 +387,7 @@ static int write_fifo_entry(context_t *ctx, struct file_struct *file)
 		return -1;
 	}
 
-	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode for fifo on file @%li\n",
 		       (long)obj_of(file)->o_pos);
@@ -516,7 +516,7 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 		goto out;
 
 	list_for_each_entry(fd, &files->fd_list, list) {
-		struct cpt_inode_image *inode;
+		struct inode_struct *inode;
 		struct file_struct *file;
 
 		file = obj_lookup_to(CPT_OBJ_FILE, fd->fdi.cpt_file);
@@ -527,7 +527,7 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 		}
 
 		if (file->fi.cpt_inode != -1) {
-			inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+			inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 			if (!inode) {
 				pr_err("No inode @%li for file at @%li\n",
 				       (long)file->fi.cpt_inode, obj_pos_of(file));
@@ -606,21 +606,20 @@ out:
 
 void free_inodes(context_t *ctx)
 {
-	obj_t *obj;
+	struct inode_struct *inode;
 
-	while ((obj = obj_pop_unhash(CPT_OBJ_INODE)))
-		obj_free(obj);
+	while ((inode = obj_pop_unhash_to(CPT_OBJ_INODE)))
+		obj_free_to(inode);
 }
 
-static void show_inode_cont(context_t *ctx, obj_t *obj)
+static void show_inode_cont(context_t *ctx, struct inode_struct *inode)
 {
-	struct cpt_inode_image *inode = obj->o_image;
-
 	pr_debug("\t@%-8li dev %10li ino %10li mode %6d nlink %6d "
 		 "rdev %10li sb %10li vfsmount @%-8li\n",
-		 (long)obj->o_pos, (long)inode->cpt_dev, (long)inode->cpt_ino,
-		 inode->cpt_mode, inode->cpt_nlink, (long)inode->cpt_rdev,
-		 (long)inode->cpt_sb, (long)inode->cpt_vfsmount);
+		 (long)obj_of(inode)->o_pos, (long)inode->ii.cpt_dev,
+		 (long)inode->ii.cpt_ino, inode->ii.cpt_mode,
+		 inode->ii.cpt_nlink, (long)inode->ii.cpt_rdev,
+		 (long)inode->ii.cpt_sb, (long)inode->ii.cpt_vfsmount);
 }
 
 int read_inodes(context_t *ctx)
@@ -631,23 +630,24 @@ int read_inodes(context_t *ctx)
 	get_section_bounds(ctx, CPT_SECT_INODE, &start, &end);
 
 	while (start < end) {
-		struct cpt_inode_image *inode;
-		obj_t *obj;
+		struct inode_struct *inode;
 
-		obj = obj_alloc(sizeof(struct cpt_inode_image));
-		if (!obj)
+		inode = obj_alloc_to(struct inode_struct, ii);
+		if (!inode)
 			return -1;
-		inode = obj->o_image;
 
-		if (read_obj_cpt(ctx->fd, CPT_OBJ_INODE, inode, start)) {
-			obj_free(obj);
+		inode->u.dumped_pipe = false;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_INODE, &inode->ii, start)) {
+			obj_free_to(inode);
 			pr_err("Can't read inode object at @%li\n", (long)start);
 			return -1;
 		}
 
-		obj_push_hash(obj, CPT_OBJ_INODE, start);
-		start += inode->cpt_next;
-		show_inode_cont(ctx, obj);
+		obj_push_hash_to(inode, CPT_OBJ_INODE, start);
+		start += inode->ii.cpt_next;
+
+		show_inode_cont(ctx, inode);
 	}
 	pr_read_end();
 

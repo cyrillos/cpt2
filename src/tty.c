@@ -33,7 +33,7 @@ void free_ttys(context_t *ctx)
 
 static int write_tty_info_entry(context_t *ctx, u32 id,
 				struct file_struct *file,
-				struct cpt_inode_image *inode,
+				struct inode_struct *inode,
 				struct tty_struct *tty)
 {
 	TtyInfoEntry info		= TTY_INFO_ENTRY__INIT;
@@ -57,7 +57,7 @@ static int write_tty_info_entry(context_t *ctx, u32 id,
 	info.type		= TTY_TYPE__PTY;
 	info.sid		= tty->ti.cpt_session;
 	info.pgrp		= tty->ti.cpt_pgrp;
-	info.rdev		= inode->cpt_rdev;
+	info.rdev		= inode->ii.cpt_rdev;
 	info.pty		= &pty;
 
 	info.locked		= !!tty_flag(tty, TTY_PTY_LOCK);
@@ -124,7 +124,7 @@ static int tty_gen_id(int major, int index)
 int write_tty_entry(context_t *ctx, struct file_struct *file)
 {
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_TTY);
-	struct cpt_inode_image *inode;
+	struct inode_struct *inode;
 	struct tty_struct *tty;
 
 	TtyFileEntry e = TTY_FILE_ENTRY__INIT;
@@ -134,7 +134,7 @@ int write_tty_entry(context_t *ctx, struct file_struct *file)
 	if (file->dumped)
 		return 0;
 
-	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("Can't find inode for file at @%li\n",
 		       (long)obj_of(file)->o_pos);
@@ -151,7 +151,7 @@ int write_tty_entry(context_t *ctx, struct file_struct *file)
 	fill_fown(&fown, file);
 
 	e.id		= obj_id_of(file);
-	e.tty_info_id	= tty_gen_id(major(inode->cpt_rdev), tty->ti.cpt_index);
+	e.tty_info_id	= tty_gen_id(major(inode->ii.cpt_rdev), tty->ti.cpt_index);
 	e.flags		= file->fi.cpt_flags;
 	e.fown		= (FownEntry *)&fown;
 
