@@ -123,11 +123,8 @@ static u32 vma_flags_to_prot(u64 flags)
 		_calc_vm_trans(flags, VM_EXECUTABLE,	PROT_EXEC);
 }
 
-static bool is_dev_zero(struct inode_struct *inode, struct file_struct *file)
+static bool is_dev_zero(struct file_struct *file)
 {
-//	if (!inode || inode->cpt_sb != TMPFS_MAGIC || !file->name)
-//		return false;
-
 	if (!file->name)
 		return false;
 
@@ -762,7 +759,7 @@ static int vma_parse(context_t *ctx, struct mm_struct *mm,
 	switch (vma->vmai.cpt_type) {
 	case CPT_VMA_TYPE_0:
 		if (file) {
-			if (is_dev_zero(inode, file)) {
+			if (is_dev_zero(file)) {
 				if (!vmai_is_shared(vma)) {
 					pr_err("Private mapping on share entry\n");
 					goto err;
