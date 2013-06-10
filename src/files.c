@@ -31,6 +31,7 @@
 #include "protobuf/regfile.pb-c.h"
 #include "protobuf/eventfd.pb-c.h"
 #include "protobuf/pipe.pb-c.h"
+#include "protobuf/fifo.pb-c.h"
 #include "protobuf/fs.pb-c.h"
 
 #define __gen_lflag_entry(postfix)			\
@@ -364,6 +365,48 @@ static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 	return ret;
 }
 
+static int write_fifo_entry(context_t *ctx, struct file_struct *file)
+{
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_FIFO);
+	FifoEntry fe = FIFO_ENTRY__INIT;
+	struct cpt_inode_image *inode;
+	int ret = -1;
+
+	if (file->dumped)
+		return 0;
+
+	/*
+	 * FIFOs are named pipes, so we need to save a path
+	 * associated with it. And there is a trick in CRIU:
+	 * names are saved in regular files image.
+	 */
+	ret = write_reg_file_entry(ctx, file);
+	if (ret) {
+		pr_err("Failed wirtting fifo path at @%li\n",
+		       (long)obj_of(file)->o_pos);
+		return -1;
+	}
+
+	inode = obj_lookup_img(CPT_OBJ_INODE, file->fi.cpt_inode);
+	if (!inode) {
+		pr_err("No inode for fifo on file @%li\n",
+		       (long)obj_of(file)->o_pos);
+		return -1;
+	}
+
+	fe.id		= obj_id_of(file);
+	fe.pipe_id	= obj_id_of(inode);
+
+	ret = pb_write_one(fd, &fe, PB_FIFO);
+	if (!ret) {
+		ret = write_pipe_data(ctx, file, inode, false);
+		if (!ret)
+			file->dumped = true;
+	}
+
+	return ret;
+}
+
 static int write_signalfd(context_t *ctx, struct file_struct *file)
 {
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_SIGNALFD);
@@ -521,6 +564,9 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 			break;
 		case FD_TYPES__PIPE:
 			ret = write_pipe_entry(ctx, file);
+			break;
+		case FD_TYPES__FIFO:
+			ret = write_fifo_entry(ctx, file);
 			break;
 		case FD_TYPES__TTY:
 			ret = write_tty_entry(ctx, file);
