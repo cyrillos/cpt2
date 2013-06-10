@@ -250,6 +250,80 @@ int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 	return ret;
 }
 
+static int write_pipe_data(context_t *ctx, struct file_struct *file,
+			   struct cpt_inode_image *inode, bool is_pipe)
+{
+	int fd = fdset_fd(ctx->fdset_glob, is_pipe ? CR_FD_PIPES_DATA : CR_FD_FIFO_DATA);
+	obj_t *obj = obj_of(inode);
+	off_t start;
+	int p[2];
+
+	union {
+		struct cpt_object_hdr	h;
+		struct cpt_obj_bits	bits;
+	} u;
+
+	ssize_t ret_in, ret_out;
+
+	/*
+	 * No underlied data.
+	 */
+	if (inode->cpt_next == inode->cpt_hdrlen)
+		return 0;
+
+	/*
+	 * FIXME I seem need to track pipe/fifo IDs to eliminate
+	 *	 duplication of data writen.
+	 */
+
+	start = obj->o_pos + inode->cpt_hdrlen;
+
+	if (read_obj_hdr(ctx->fd, &u.h, start)) {
+		pr_err("Failed to read object header at @%li\n",
+		       (long)start);
+		return -1;
+	}
+
+	if (u.h.cpt_object != CPT_OBJ_BITS &&
+	    u.h.cpt_content != CPT_CONTENT_DATA) {
+		pr_err("Wrong object %d:%d at @%li\n",
+		       u.h.cpt_object, (int)u.h.cpt_content, (long)start);
+		return -1;
+	}
+
+	if (read_obj_cont(ctx->fd, &u.bits)) {
+		pr_err("Failed to read bits object at @%li\n",
+		       (long)start);
+		return -1;
+	}
+
+	/*
+	 * FIXME Should I check for u.bits.cpt_size being crossing
+	 *	 objects bounds?
+	 */
+
+	if (pipe(p)) {
+		pr_perror("Can't create transport for fifo/pipe data");
+		return -1;
+	}
+
+	ret_in = splice(ctx->fd, NULL, p[1], NULL, u.bits.cpt_size, SPLICE_F_MOVE);
+	if (ret_in != u.bits.cpt_size) {
+		pr_perror("Can't read %li bytes from image at @%li\n",
+			  (long)u.bits.cpt_size, (long)start);
+		return -1;
+	}
+
+	ret_out = splice(p[0], NULL, fd, NULL, u.bits.cpt_size, SPLICE_F_MOVE);
+	if (ret_out != u.bits.cpt_size) {
+		pr_perror("Can't write %li bytes to image\n",
+			  (long)u.bits.cpt_size);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 {
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_PIPES);
@@ -281,12 +355,11 @@ static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 	pe.fown		= &fown;
 
 	ret = pb_write_one(fd, &pe, PB_PIPES);
-	if (!ret)
-		file->dumped = true;
-
-	/*
-	 * FIXME Where is the pipe data?
-	 */
+	if (!ret) {
+		ret = write_pipe_data(ctx, file, inode, true);
+		if (!ret)
+			file->dumped = true;
+	}
 
 	return ret;
 }
