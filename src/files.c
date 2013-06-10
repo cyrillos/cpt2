@@ -267,15 +267,16 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	ssize_t ret_in, ret_out;
 
 	/*
+	 * Already there.
+	 */
+	if (inode->u.dumped_pipe)
+		return 0;
+
+	/*
 	 * No underlied data.
 	 */
 	if (inode->ii.cpt_next == inode->ii.cpt_hdrlen)
 		return 0;
-
-	/*
-	 * FIXME I seem need to track pipe/fifo IDs to eliminate
-	 *	 duplication of data writen.
-	 */
 
 	start = obj->o_pos + inode->ii.cpt_hdrlen;
 
@@ -321,6 +322,8 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 			  (long)u.bits.cpt_size);
 		return -1;
 	}
+
+	inode->u.dumped_pipe = true;
 
 	return 0;
 }
