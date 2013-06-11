@@ -20,6 +20,7 @@
 #include "../../../protobuf/mnt.pb-c.h"
 
 struct ns_struct *root_ns;
+static int anon_dev_minor = 1;
 
 void free_ns(context_t *ctx)
 {
@@ -92,15 +93,8 @@ static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 
 	list_for_each_entry(v, &ns->list, list) {
 		mnt_entry__init(&e);
-		int fstype;
 
-		fstype = getfstype(v);
-		if (fstype < 0) {
-			pr_err("Can't encode fs type %s\n", v->mnt_type);
-			return -1;
-		}
-
-		e.fstype		= fstype;
+		e.fstype		= v->fstype;
 		e.mnt_id		= obj_id_of(v);
 		e.root_dev		= v->s_dev;
 		e.parent_mnt_id		= (v == ns->root) ? 1 : obj_id_of(ns->root);
@@ -115,6 +109,38 @@ static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 	}
 
 	return 0;
+}
+
+static int get_dev(struct vfsmnt_struct *v)
+{
+	struct stat st;
+
+	/*
+	 * FIXME
+	 *
+	 * We require only root file system being mounted
+	 * at moment of conversion. If there are mount points
+	 * referring to anonymous block device, such as sysfs,
+	 * we need to calculate device numbers by hand.
+	 */
+
+	switch (v->fstype) {
+	case FSTYPE__PROC:
+	case FSTYPE__SYSFS:
+	case FSTYPE__DEVTMPFS:
+	case FSTYPE__TMPFS:
+	case FSTYPE__SIMFS:
+		BUG_ON(anon_dev_minor >= KDEV_MINORMASK);
+		return MKKDEV(0, anon_dev_minor++);
+	}
+
+	if (stat(v->mnt_point, &st)) {
+		pr_perror("Can't get stat on mount %s",
+			  v->mnt_point);
+		return -1;
+	}
+
+	return (int)st.st_dev;
 }
 
 int read_ns(context_t *ctx)
@@ -139,7 +165,6 @@ int read_ns(context_t *ctx)
 	obj_push_hash_to(ns, CPT_OBJ_NAMESPACE, start);
 
 	for (start += ns->nsi.cpt_hdrlen; start < end; start += h.cpt_next) {
-		struct stat st;
 		off_t pos, next;
 
 		if (read_obj_hdr(ctx->fd, &h, start)) {
@@ -178,13 +203,17 @@ int read_ns(context_t *ctx)
 		if (IS_ERR(v->mnt_type))
 			goto free;
 
-		if (stat(v->mnt_point, &st)) {
-			pr_perror("Can't get stat on mount %s",
-				  v->mnt_point);
+		v->fstype = getfstype(v);
+		if (v->fstype < 0) {
+			pr_err("Can't encode fs type %s\n", v->mnt_type);
 			goto free;
 		}
 
-		v->s_dev = st.st_dev;
+		v->s_dev = get_dev(v);
+		if (v->s_dev < 0) {
+			pr_err("Can't encode device %s\n", v->mnt_type);
+			goto free;
+		}
 
 		list_add_tail(&v->list, &ns->list);
 		obj_hash_to(v, start);

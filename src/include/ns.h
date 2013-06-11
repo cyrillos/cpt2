@@ -14,6 +14,8 @@ struct vfsmnt_struct {
 	struct list_head		list;
 
 	int				s_dev;
+	int				fstype;
+
 	char				*mnt_dev;
 	char				*mnt_point;
 	char				*mnt_type;
