@@ -119,6 +119,7 @@ static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 
 int read_ns(context_t *ctx)
 {
+	struct vfsmnt_struct *v = NULL;
 	struct cpt_object_hdr h;
 	struct ns_struct *ns;
 
@@ -138,7 +139,6 @@ int read_ns(context_t *ctx)
 	obj_push_hash_to(ns, CPT_OBJ_NAMESPACE, start);
 
 	for (start += ns->nsi.cpt_hdrlen; start < end; start += h.cpt_next) {
-		struct vfsmnt_struct *v;
 		struct stat st;
 		off_t pos, next;
 
@@ -153,47 +153,35 @@ int read_ns(context_t *ctx)
 		v = obj_alloc_to(struct vfsmnt_struct, vfsmnt);
 		if (!v)
 			return -1;
+
 		INIT_LIST_HEAD(&v->list);
 		v->mnt_dev = v->mnt_point = v->mnt_type = NULL;
 		memcpy(&v->vfsmnt, &h, sizeof(h));
 
 		if (read_obj_cont(ctx->fd, &v->vfsmnt)) {
 			pr_err("Can't read vfsmount payload at %li\n", (long)start);
-			goto out;
+			goto free;
 		}
 
 		pos = start + h.cpt_hdrlen;
 		v->mnt_dev = read_name(ctx->fd, pos, &next);
-		if (IS_ERR(v->mnt_dev)) {
-			obj_free_to(v);
-			goto out;
-		}
+		if (IS_ERR(v->mnt_dev))
+			goto free;
 
 		pos += next;
 		v->mnt_point = read_name(ctx->fd, pos, &next);
-		if (IS_ERR(v->mnt_point)) {
-			xfree(v->mnt_dev);
-			obj_free_to(v);
-			goto out;
-		}
+		if (IS_ERR(v->mnt_point))
+			goto free;
 
 		pos += next;
 		v->mnt_type = read_name(ctx->fd, pos, &next);
-		if (IS_ERR(v->mnt_type)) {
-			xfree(v->mnt_dev);
-			xfree(v->mnt_point);
-			obj_free_to(v);
-			goto out;
-		}
+		if (IS_ERR(v->mnt_type))
+			goto free;
 
 		if (stat(v->mnt_point, &st)) {
 			pr_perror("Can't get stat on mount %s",
 				  v->mnt_point);
-			xfree(v->mnt_dev);
-			xfree(v->mnt_point);
-			xfree(v->mnt_type);
-			obj_free_to(v);
-			goto out;
+			goto free;
 		}
 
 		v->s_dev = st.st_dev;
@@ -207,11 +195,25 @@ int read_ns(context_t *ctx)
 			root_ns = ns;
 			ns->root = v;
 		}
+
+		v = NULL;
 	}
 	ret = 0;
 	pr_read_end();
 out:
 	return ret;
+
+free:
+	if (v) {
+		if (!IS_ERR(v->mnt_dev))
+			xfree(v->mnt_dev);
+		if (!IS_ERR(v->mnt_point))
+			xfree(v->mnt_point);
+		if (!IS_ERR(v->mnt_type))
+			xfree(v->mnt_type);
+		obj_free_to(v);
+	}
+	goto out;
 }
 
 int convert_ns(context_t *ctx)
