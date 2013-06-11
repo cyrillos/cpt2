@@ -57,7 +57,7 @@ static char *mnt_fstypes[] = {
 	[FSTYPE__SIMFS]		= "simfs",
 };
 
-static int setfstype(MntEntry *e, struct vfsmnt_struct *v)
+static int getfstype(struct vfsmnt_struct *v)
 {
 	unsigned int i;
 
@@ -66,8 +66,7 @@ static int setfstype(MntEntry *e, struct vfsmnt_struct *v)
 	if (v->mnt_type) {
 		for (i = 1; i < ARRAY_SIZE(mnt_fstypes); i++) {
 			if (strcmp(v->mnt_type, mnt_fstypes[i]) == 0) {
-				e->fstype = i;
-				return 0;
+				return i;
 			}
 		}
 	}
@@ -93,12 +92,15 @@ static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 
 	list_for_each_entry(v, &ns->list, list) {
 		mnt_entry__init(&e);
+		int fstype;
 
-		if (setfstype(&e, v)) {
+		fstype = getfstype(v);
+		if (fstype < 0) {
 			pr_err("Can't encode fs type %s\n", v->mnt_type);
 			return -1;
 		}
 
+		e.fstype		= fstype;
 		e.mnt_id		= obj_id_of(v);
 		e.root_dev		= v->s_dev;
 		e.parent_mnt_id		= (v == ns->root) ? 1 : obj_id_of(ns->root);
