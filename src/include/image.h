@@ -19,6 +19,8 @@
 
 #define O_DUMP		(O_RDWR | O_CREAT | O_EXCL)
 
+#define REMAP_GHOST	(1 << 31)
+
 extern int open_image(context_t *ctx, int type, int flags, ...);
 extern int open_image_fdset(context_t *ctx, struct fdset *fdset, pid_t pid,
 			    unsigned int from, unsigned int to, int flags);

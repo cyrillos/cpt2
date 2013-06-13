@@ -16,6 +16,9 @@
 # define AT_VECTOR_SIZE 22
 #endif
 
+#define MAJOR(dev)		((dev) >> 8)
+#define MINOR(dev)		((dev) & 0xff)
+
 #define KDEV_MINORBITS		20
 #define KDEV_MINORMASK		((1UL << KDEV_MINORBITS) - 1)
 #define MKKDEV(ma, mi)		(((ma) << KDEV_MINORBITS) | (mi))

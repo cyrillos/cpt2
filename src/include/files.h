@@ -53,6 +53,7 @@ struct fs_struct {
 struct inode_struct {
 	union {
 		bool			dumped_pipe;
+		bool			dumped_ghost;
 	} u;
 
 	struct cpt_inode_image		ii;

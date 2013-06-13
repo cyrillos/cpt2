@@ -34,6 +34,8 @@
 #include "protobuf/fifo.pb-c.h"
 #include "protobuf/pipe-data.pb-c.h"
 #include "protobuf/fs.pb-c.h"
+#include "protobuf/remap-file-path.pb-c.h"
+#include "protobuf/ghost-file.pb-c.h"
 
 #define __gen_lflag_entry(postfix)			\
 	{						\
@@ -205,6 +207,98 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 	return 0;
 }
 
+static int dump_ghost_file(context_t *ctx, struct file_struct *file,
+			   struct inode_struct *inode)
+{
+	RemapFilePathEntry rpe = REMAP_FILE_PATH_ENTRY__INIT;
+	GhostFileEntry gfe = GHOST_FILE_ENTRY__INIT;
+
+	int remap_fd = fdset_fd(ctx->fdset_glob, CR_FD_REMAP_FPATH);
+	int ghost_fd = -1;
+	int ret = -1;
+
+	if (inode->ii.cpt_nlink != 0) {
+		pr_err("Found %d links on deleted file inode at @%li\n",
+		       inode->ii.cpt_nlink, (long)obj_of(inode)->o_pos);
+		return -1;
+	}
+
+	BUG_ON(obj_id_of(inode) & REMAP_GHOST);
+
+	if (!inode->u.dumped_ghost) {
+		ghost_fd = open_image(ctx, CR_FD_GHOST_FILE, O_DUMP, obj_id_of(inode));
+		if (ghost_fd < 0)
+			return -1;
+
+		gfe.uid		= inode->ii.cpt_uid;
+		gfe.gid		= inode->ii.cpt_gid;
+		gfe.mode	= inode->ii.cpt_mode;
+
+		gfe.has_dev	= true;
+		gfe.has_ino	= true;
+		gfe.dev		= MKKDEV(MAJOR(inode->ii.cpt_dev),
+					 MINOR(inode->ii.cpt_dev));
+		gfe.ino		= inode->ii.cpt_ino;
+
+		if (pb_write_one(ghost_fd, &gfe, PB_GHOST_FILE))
+			goto err;
+
+		if (S_ISREG(inode->ii.cpt_mode)) {
+			/*
+			 * Contents of a ghost file is laying as
+			 * a payload to appropriate inode.
+			 */
+			size_t payload = (long)inode->ii.cpt_next - (long)inode->ii.cpt_hdrlen;
+			if (payload) {
+				off_t where;
+
+				where  = (off_t)obj_of(inode)->o_pos;
+				where += (off_t)inode->ii.cpt_hdrlen;
+
+				if (lseek(ctx->fd, where, SEEK_SET) != where) {
+					pr_perror("Can't seek on inode data\n");
+					goto err;
+				}
+
+				if (splice_data(ctx->fd, ghost_fd, payload)) {
+					pr_perror("Can't seek on inode data\n");
+					goto err;
+				}
+			}
+		}
+
+		inode->u.dumped_ghost = true;
+	}
+
+	rpe.orig_id	= obj_id_of(file);
+	rpe.remap_id	= obj_id_of(inode) | REMAP_GHOST;
+
+	ret = pb_write_one(remap_fd, &rpe, PB_REMAP_FPATH);
+err:
+	if (ghost_fd != -1)
+		close(ghost_fd);
+	return ret;
+}
+
+static int check_path_remap(context_t *ctx, struct file_struct *file)
+{
+	struct inode_struct *inode;
+
+	if (file->fi.cpt_inode == -1)
+		return 0;
+
+	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
+	if (!inode) {
+		pr_err("No inode @%li for file at @%li\n",
+		       (long)file->fi.cpt_inode, obj_pos_of(file));
+		return -1;
+	}
+
+	if (file->fi.cpt_lflags & CPT_DENTRY_DELETED)
+		return dump_ghost_file(ctx, file, inode);
+	return 0;
+}
+
 enum pid_type {
 	PIDTYPE_PID,
 	PIDTYPE_PGID,
@@ -227,6 +321,16 @@ void fill_fown(FownEntry *e, struct file_struct *file)
 	e->pid		= file->fi.cpt_fown_pid;
 }
 
+static char *demangle_deleted(char *name)
+{
+	/*
+	 * FIXME Do we always have one prefix here?
+	 */
+	if (strncmp(name, " (deleted)", 10) == 0)
+		return &name[10];
+	return name;
+}
+
 int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 {
 	int rfd = fdset_fd(ctx->fdset_glob, CR_FD_REG_FILES);
@@ -239,11 +343,17 @@ int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 
 	fill_fown(&fown, file);
 
+	if (check_path_remap(ctx, file)) {
+		pr_err("Failed to check remapping on file at @%li\n",
+			(long)obj_of(file)->o_pos);
+		return -1;
+	}
+
 	rfe.id		= obj_id_of(file);
 	rfe.flags	= file->fi.cpt_flags;
 	rfe.pos		= file->fi.cpt_pos;
 	rfe.fown	= &fown;
-	rfe.name	= file->name;
+	rfe.name	= demangle_deleted(file->name);
 
 	ret = pb_write_one(rfd, &rfe, PB_REG_FILES);
 	if (!ret)
@@ -655,11 +765,12 @@ void free_inodes(context_t *ctx)
 static void show_inode_cont(context_t *ctx, struct inode_struct *inode)
 {
 	pr_debug("\t@%-8li dev %10li ino %10li mode %6d nlink %6d "
-		 "rdev %10li sb %10li vfsmount @%-8li\n",
+		 "rdev %10li sb %10li vfsmount @%-8li (payload %li)\n",
 		 (long)obj_of(inode)->o_pos, (long)inode->ii.cpt_dev,
 		 (long)inode->ii.cpt_ino, inode->ii.cpt_mode,
 		 inode->ii.cpt_nlink, (long)inode->ii.cpt_rdev,
-		 (long)inode->ii.cpt_sb, (long)inode->ii.cpt_vfsmount);
+		 (long)inode->ii.cpt_sb, (long)inode->ii.cpt_vfsmount,
+		 (long)inode->ii.cpt_next - (long)inode->ii.cpt_hdrlen);
 }
 
 int read_inodes(context_t *ctx)
