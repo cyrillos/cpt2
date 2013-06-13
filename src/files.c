@@ -369,15 +369,11 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	PipeDataEntry pde = PIPE_DATA_ENTRY__INIT;
 	obj_t *obj = obj_of(inode);
 	off_t start;
-	int p[2];
 
 	union {
 		struct cpt_object_hdr	h;
 		struct cpt_obj_bits	bits;
 	} u;
-
-	ssize_t ret_in, ret_out, left;
-	int attempts = 16; /* Default number of buffers in pipe */
 
 	/*
 	 * Already there.
@@ -413,18 +409,7 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	}
 
 	/*
-	 * FIXME Should I check for u.bits.cpt_size being crossing
-	 *	 objects bounds?
-	 */
-
-	if (pipe(p)) {
-		pr_perror("Can't create transport for fifo/pipe data");
-		return -1;
-	}
-
-	/*
-	 * NOTE OpenVZ image has no pipe size stored, so
-	 *      just ignore it.
+	 * NOTE OpenVZ image has no pipe size stored, so just ignore it.
 	 */
 	pde.pipe_id	= obj_id_of(inode);
 	pde.bytes	= u.bits.cpt_size;
@@ -432,47 +417,21 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 
 	if (pb_write_one(fd, &pde, PB_PIPES_DATA)) {
 		pr_err("Can't write pde to image\n");
-		goto err;
+		return -1;
 	}
 
-	left = u.bits.cpt_size;
-
-	while (left) {
-		ret_in = splice(ctx->fd, NULL, p[1], NULL, left, SPLICE_F_MOVE);
-		if (ret_in == -1) {
-			pr_perror("Can't read %li bytes from image at @%li",
-				(long)u.bits.cpt_size, (long)start);
-			goto err;
-		}
-
-		ret_out = splice(p[0], NULL, fd, NULL, left, SPLICE_F_MOVE);
-		if (ret_out == -1) {
-			pr_perror("Can't write %li bytes to image",
-				  (long)u.bits.cpt_size);
-			goto err;
-		}
-
-		if (ret_in != ret_out) {
-			pr_err("I/O error on pipe level %li:%li at @%li\n",
-			       (long)ret_in, (long)ret_out, (long)start);
-			goto err;
-		}
-
-		left -= ret_out;
-		if (attempts-- < 0) {
-			pr_err("Too many attempts to flush pipe data at @%li\n",
-			       (long)start);
-			goto err;
-		}
+	/*
+	 * FIXME Should I check for u.bits.cpt_size being crossing
+	 *	 objects bounds?
+	 */
+	if (splice_data(ctx->fd, fd, u.bits.cpt_size)) {
+		pr_err("Failed splicing %li bytes of pipe/fifo data at @%li",
+		       (long)u.bits.cpt_size, (long)start);
+		return -1;
 	}
 
 	inode->u.dumped_pipe = true;
 	return 0;
-
-err:
-	close(p[0]);
-	close(p[1]);
-	return -1;
 }
 
 static int write_pipe_entry(context_t *ctx, struct file_struct *file)
