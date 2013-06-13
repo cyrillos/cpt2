@@ -32,6 +32,7 @@
 #include "protobuf/eventfd.pb-c.h"
 #include "protobuf/pipe.pb-c.h"
 #include "protobuf/fifo.pb-c.h"
+#include "protobuf/pipe-data.pb-c.h"
 #include "protobuf/fs.pb-c.h"
 
 #define __gen_lflag_entry(postfix)			\
@@ -255,6 +256,7 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 			   struct inode_struct *inode, bool is_pipe)
 {
 	int fd = fdset_fd(ctx->fdset_glob, is_pipe ? CR_FD_PIPES_DATA : CR_FD_FIFO_DATA);
+	PipeDataEntry pde = PIPE_DATA_ENTRY__INIT;
 	obj_t *obj = obj_of(inode);
 	off_t start;
 	int p[2];
@@ -264,7 +266,8 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 		struct cpt_obj_bits	bits;
 	} u;
 
-	ssize_t ret_in, ret_out;
+	ssize_t ret_in, ret_out, left;
+	int attempts = 16; /* Default number of buffers in pipe */
 
 	/*
 	 * Already there.
@@ -309,23 +312,57 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 		return -1;
 	}
 
-	ret_in = splice(ctx->fd, NULL, p[1], NULL, u.bits.cpt_size, SPLICE_F_MOVE);
-	if (ret_in != u.bits.cpt_size) {
-		pr_perror("Can't read %li bytes from image at @%li\n",
-			  (long)u.bits.cpt_size, (long)start);
-		return -1;
+	/*
+	 * NOTE OpenVZ image has no pipe size stored, so
+	 *      just ignore it.
+	 */
+	pde.pipe_id	= obj_id_of(inode);
+	pde.bytes	= u.bits.cpt_size;
+	pde.has_size	= false;
+
+	if (pb_write_one(fd, &pde, PB_PIPES_DATA)) {
+		pr_err("Can't write pde to image\n");
+		goto err;
 	}
 
-	ret_out = splice(p[0], NULL, fd, NULL, u.bits.cpt_size, SPLICE_F_MOVE);
-	if (ret_out != u.bits.cpt_size) {
-		pr_perror("Can't write %li bytes to image\n",
-			  (long)u.bits.cpt_size);
-		return -1;
+	left = u.bits.cpt_size;
+
+	while (left) {
+		ret_in = splice(ctx->fd, NULL, p[1], NULL, left, SPLICE_F_MOVE);
+		if (ret_in == -1) {
+			pr_perror("Can't read %li bytes from image at @%li",
+				(long)u.bits.cpt_size, (long)start);
+			goto err;
+		}
+
+		ret_out = splice(p[0], NULL, fd, NULL, left, SPLICE_F_MOVE);
+		if (ret_out == -1) {
+			pr_perror("Can't write %li bytes to image",
+				  (long)u.bits.cpt_size);
+			goto err;
+		}
+
+		if (ret_in != ret_out) {
+			pr_err("I/O error on pipe level %li:%li at @%li\n",
+			       (long)ret_in, (long)ret_out, (long)start);
+			goto err;
+		}
+
+		left -= ret_out;
+		if (attempts-- < 0) {
+			pr_err("Too many attempts to flush pipe data at @%li\n",
+			       (long)start);
+			goto err;
+		}
 	}
 
 	inode->u.dumped_pipe = true;
-
 	return 0;
+
+err:
+	close(p[0]);
+	close(p[1]);
+	return -1;
 }
 
 static int write_pipe_entry(context_t *ctx, struct file_struct *file)
