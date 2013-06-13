@@ -1,7 +1,7 @@
 - Check @cpt_flags usage, especially used in fd descriptors and file descriptors
 - pipe data is not yet dumped
 - stubs for IPC part, completely
-- stubs for fanotify, fifo/data, socket queues, remap/ghost files, namespaces files (ie /proc/ns:[])
+- stubs for fanotify, socket queues, remap/ghost files, namespaces files (ie /proc/ns:[])
 - sockets filters
 - netdevice, only lo supported
 - no timers (not yet implemented in criu)
@@ -9,7 +9,5 @@
 - iptables data
 - routing need to be revisited
 - while there is eventqueue in openvz, no such thing in criu, ignoring
-- inodes referred to deleted files may have undelied path dump (see dump_one_inode
-  in openvz source code)
-- also there are following undelied data in inodes: tty ref, fifo data,
-  regular files content (including shmem,shm)
+- inodes referred to deleted files may have undelied path dump (see dump_one_inode in openvz source code)
+- also there are following undelied data in inodes: tty ref, regular files content (including shmem,shm)
