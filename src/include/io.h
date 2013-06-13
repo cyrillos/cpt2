@@ -6,6 +6,8 @@
 
 #include "log.h"
 
+extern int splice_data(int from, int to, size_t size);
+
 extern int read_data(int fd, void *ptr, size_t size, bool eof);
 extern int read_data_at(int fd, void *ptr, size_t size, off_t pos, bool eof);
 

@@ -2,9 +2,54 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <fcntl.h>
 
 #include "io.h"
 #include "log.h"
+
+#undef LOG_PREFIX
+#define LOG_PREFIX "io: "
+
+int splice_data(int from, int to, size_t size)
+{
+	int attempts = 16; /* Default number of buffers in pipe */
+	ssize_t ret_in, ret_out;
+	int p[2];
+
+	if (pipe(p)) {
+		pr_perror("Can't create transport for splicing data");
+		return -1;
+	}
+
+	while (size) {
+		ret_in = splice(from, NULL, p[1], NULL, size, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
+		if (ret_in == -1) {
+			pr_perror("Can't read %li bytes", (long)size);
+			goto err;
+		}
+
+		ret_out = splice(p[0], NULL, to, NULL, size, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
+		if (ret_out == -1) {
+			pr_perror("Can't write %li bytes", (long)size);
+			goto err;
+		}
+
+		if (ret_in != ret_out) {
+			pr_err("Error on pipe level %li:%li\n", (long)ret_in, (long)ret_out);
+			goto err;
+		}
+
+		size -= ret_out;
+		if (attempts-- < 0) {
+			pr_err("Too many attempts to flush pipe data\n");
+			goto err;
+		}
+	}
+
+	return 0;
+err:
+	return -1;
+}
 
 int read_data(int fd, void *ptr, size_t size, bool eof)
 {
