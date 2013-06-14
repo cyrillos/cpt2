@@ -27,6 +27,7 @@
 
 #include "protobuf.h"
 #include "protobuf/pstree.pb-c.h"
+#include "protobuf/rlimit.pb-c.h"
 #include "protobuf/creds.pb-c.h"
 #include "protobuf/core.pb-c.h"
 #include "protobuf/sa.pb-c.h"
@@ -494,9 +495,37 @@ out:
 	return ret;
 }
 
+static int write_task_rlimits(context_t *ctx, struct task_struct *t)
+{
+	int fd, i, ret;
+
+	fd = open_image(ctx, CR_FD_RLIMIT, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	for (i = 0, ret = 0; i < CPT_RLIM_NLIMITS; i++) {
+		RlimitEntry re = RLIMIT_ENTRY__INIT;
+
+		re.cur = t->ti.cpt_rlim_cur[i];
+		re.max = t->ti.cpt_rlim_max[i];
+
+		ret |= pb_write_one(fd, &re, PB_RLIMIT);
+	}
+
+	close(fd);
+	return ret;
+}
+
 static int __write_task_images(context_t *ctx, struct task_struct *t)
 {
 	int ret;
+
+	ret = write_task_rlimits(ctx, t);
+	if (ret) {
+		pr_err("Failed writing rlimits for task %d\n",
+		       t->ti.cpt_pid);
+		goto out;
+	}
 
 	ret = write_task_files(ctx, t);
 	if (ret) {
