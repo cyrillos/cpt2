@@ -7,6 +7,8 @@
 
 #include "asm/fpu.h"
 
+#include "syscall-codes.h"
+
 #include "cpt-image.h"
 #include "hashtable.h"
 #include "xmalloc.h"
@@ -70,6 +72,26 @@ static u32 decode_segment(u32 segno)
 
 	pr_err("Invalid segment register %d\n", segno);
 	return 0;
+}
+
+static void adjust_syscall_ret(UserX86RegsEntry *gpregs)
+{
+	if ((int)gpregs->orig_ax >= 0) {
+		/* Restart the system call */
+		switch ((int)gpregs->ax) {
+		case -ERESTARTNOHAND:
+		case -ERESTARTSYS:
+		case -ERESTARTNOINTR:
+			gpregs->ax = gpregs->orig_ax;
+			gpregs->ip -= 2;
+			break;
+		case -ERESTART_RESTARTBLOCK:
+			gpregs->ax = __NR_restart_syscall;
+			gpregs->ip -= 2;
+			break;
+		}
+	}
+
 }
 
 static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core)
@@ -205,6 +227,8 @@ static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core
 			core->thread_info->gpregs->es		= decode_segment(u.regs.cpt_es);
 			core->thread_info->gpregs->fs		= decode_segment(u.regs.cpt_fsindex);
 			core->thread_info->gpregs->gs		= decode_segment(u.regs.cpt_gsindex);
+
+			adjust_syscall_ret(core->thread_info->gpregs);
 
 		} else if (u.h.cpt_object == CPT_OBJ_TASK_AUX) {
 			if (read_obj_cpt_cont(ctx->fd, &u.aux)) {
