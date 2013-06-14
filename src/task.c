@@ -490,20 +490,6 @@ out:
 }
 
 
-static int write_task_flocks(context_t *ctx, struct task_struct *t)
-{
-	int ret = 0;
-	int fd = -1;
-
-	fd = open_image(ctx, CR_FD_FILE_LOCKS, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
-	goto out;
-out:
-	close_safe(&fd);
-	return ret;
-}
-
 static int write_task_rlimits(context_t *ctx, struct task_struct *t)
 {
 	int fd, i, ret;
@@ -616,13 +602,6 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 	ret = write_task_fs(ctx, t);
 	if (ret) {
 		pr_err("Failed writing fs for task %d\n",
-		       t->ti.cpt_pid);
-		goto out;
-	}
-
-	ret = write_task_flocks(ctx, t);
-	if (ret) {
-		pr_err("Failed writing file locks for task %d\n",
 		       t->ti.cpt_pid);
 		goto out;
 	}
