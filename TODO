@@ -1,6 +1,6 @@
 - Check @cpt_flags usage, especially used in fd descriptors and file descriptors
 - stubs for IPC part, completely
-- stubs for fanotify, socket queues, remap/ghost files, namespaces files (ie /proc/ns:[])
+- stubs for fanotify, socket queues, remap files, namespaces files (ie /proc/ns:[])
 - sockets filters
 - netdevice, only lo supported
 - no timers (not yet implemented in criu)
