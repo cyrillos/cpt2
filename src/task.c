@@ -4,6 +4,7 @@
 
 #include <sys/types.h>
 #include <linux/futex.h>
+#include <linux/sched.h>
 
 #include "asm/fpu.h"
 
@@ -325,14 +326,22 @@ static int write_task_core(context_t *ctx, struct task_struct *t)
 
 	ret = pb_write_one(core_fd, &core, PB_CORE);
 
-#if 0
 	/*
-	 * FIXME No sched entries in image yet.
+	 * FIXME Revisit sched entries.
 	 */
-	thread_core.sched_nice		= 0;
-	thread_core.sched_policy	= 0;
-	thread_core.sched_prio		= 0;
-#endif
+
+#define MAX_USER_RT_PRIO	100
+#define MAX_RT_PRIO		MAX_USER_RT_PRIO
+#define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
+
+	thread_core.has_sched_nice	= true;
+	thread_core.sched_nice		= 20 - PRIO_TO_NICE(t->ti.cpt_static_prio);
+
+	thread_core.has_sched_policy	= true;
+	thread_core.sched_policy	= t->ti.cpt_policy;
+
+	thread_core.has_sched_prio	= true;
+	thread_core.sched_prio		= t->ti.cpt_rt_priority;
 out:
 	close_safe(&core_fd);
 	return ret;
