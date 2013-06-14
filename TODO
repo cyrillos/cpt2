@@ -1,5 +1,4 @@
 - Check @cpt_flags usage, especially used in fd descriptors and file descriptors
-- pipe data is not yet dumped
 - stubs for IPC part, completely
 - stubs for fanotify, socket queues, remap/ghost files, namespaces files (ie /proc/ns:[])
 - sockets filters
