@@ -143,7 +143,7 @@ static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core
 			}
 			switch (u.h.cpt_content) {
 			case CPT_CONTENT_STACK:
-				/* skip it */
+				/* FIXME Not in criu */
 				continue;
 			case CPT_CONTENT_X86_FPUSTATE:
 				if (u.bits.cpt_size != sizeof(xsave.i387)) {
@@ -240,9 +240,24 @@ static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core
 			/* See note at FUTEX_RLA_LEN definition */
 			core->thread_core->futex_rla		= u.aux.cpt_robust_list;
 			core->thread_core->futex_rla_len	= FUTEX_RLA_LEN;
-		} else if (u.h.cpt_object == CPT_OBJ_SIGNAL_STRUCT)
+		} else if (u.h.cpt_object == CPT_OBJ_SIGNAL_STRUCT) {
+			/* FIXME Implement */
 			continue;
-		else
+		} else if (u.h.cpt_object == CPT_OBJ_LASTSIGINFO) {
+			/* FIXME Not in criu */
+			continue;
+		} else if (u.h.cpt_object == CPT_OBJ_SIGALTSTACK) {
+			/* FIXME Not in criu */
+			continue;
+		} else if (u.h.cpt_object == CPT_OBJ_SIGINFO) {
+			/*
+			 * FIXME Implement
+			 * First stands for dump_sigqueue(&tsk->pending, ctx);
+			 * Second for last_thread, dump_one_signal_struct(tg_obj, ctx);
+			 * dump_sigqueue(&sig->shared_pending, ctx);
+			 */
+			continue;
+		} else
 			goto unknown_obj;
 	}
 	ret = 0;
