@@ -10,3 +10,4 @@
 - while there is eventqueue in openvz, no such thing in criu, ignoring
 - inodes referred to deleted files may have undelied path dump (see dump_one_inode in openvz source code)
 - also there are following undelied data in inodes: tty ref, regular files content (including shmem,shm)
+- convert CPT_OBJ_SIGNAL_STRUCT, CPT_OBJ_LASTSIGINFO, CPT_OBJ_SIGALTSTACK, CPT_OBJ_SIGINFO if needed
