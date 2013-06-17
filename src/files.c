@@ -296,6 +296,10 @@ static int check_path_remap(context_t *ctx, struct file_struct *file)
 
 	if (file->fi.cpt_lflags & CPT_DENTRY_DELETED)
 		return dump_ghost_file(ctx, file, inode);
+
+	/*
+	 * FIXME Deleted but linked path.
+	 */
 	return 0;
 }
 
