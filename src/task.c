@@ -795,6 +795,7 @@ int read_tasks(context_t *ctx)
 		INIT_LIST_HEAD(&task->threads);
 		task->n_threads = 0;
 		task->parent = NULL;
+		memzero_p(&task->aux_pos);
 
 		if (read_obj(ctx->fd, CPT_OBJ_TASK, &task->ti, sizeof(task->ti), start)) {
 			obj_free_to(task);
