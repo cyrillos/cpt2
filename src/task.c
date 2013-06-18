@@ -778,6 +778,75 @@ static void show_task_cont(context_t *ctx, struct task_struct *t)
 		 (long)ti->cpt_posix_timers);
 }
 
+static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
+{
+	struct cpt_object_hdr h;
+	off_t start;
+
+	for (start = obj_of(t)->o_pos + t->ti.cpt_hdrlen;
+	     start < obj_of(t)->o_pos + t->ti.cpt_next;
+	     start += h.cpt_next) {
+
+		if (read_obj_hdr(ctx->fd, &h, start)) {
+			pr_err("Can't read task data header at %li\n", (long)start);
+			return -1;
+		}
+
+		switch (h.cpt_object) {
+		case CPT_OBJ_X86_64_REGS:
+			t->aux_pos.off_gpr = start;
+			break;
+		case CPT_OBJ_BITS:
+			switch (h.cpt_content) {
+			case CPT_CONTENT_STACK:
+				t->aux_pos.off_kstack = start;
+				break;
+			case CPT_CONTENT_X86_XSAVE:
+				t->aux_pos.off_xsave = start;
+				break;
+			case CPT_CONTENT_X86_FPUSTATE:
+				t->aux_pos.off_fxsave = start;
+				break;
+			case CPT_CONTENT_X86_FPUSTATE_OLD:
+				t->aux_pos.off_fsave = start;
+				break;
+			default:
+				goto unknown_obj;
+			}
+			break;
+		case CPT_OBJ_LASTSIGINFO:
+			t->aux_pos.off_lastsiginfo = start;
+			break;
+		case CPT_OBJ_SIGALTSTACK:
+			t->aux_pos.off_sigaltstack = start;
+			break;
+		case CPT_OBJ_TASK_AUX:
+			t->aux_pos.off_futex = start;
+			break;
+		case CPT_OBJ_SIGNAL_STRUCT:
+			t->aux_pos.off_signal = start;
+			break;
+		case CPT_OBJ_SIGINFO:
+			/*
+			 * Private queue comes first in the image.
+			 */
+			if (t->aux_pos.off_sig_priv_pending)
+				t->aux_pos.off_sig_priv_pending = start;
+			else
+				t->aux_pos.off_sig_share_pending = start;
+			break;
+		default:
+			goto unknown_obj;
+		}
+	}
+	return 0;
+
+unknown_obj:
+	pr_err("Unexpected object %d/%d at @%li\n",
+	       h.cpt_object, h.cpt_content, (long)start);
+	return -1;
+}
+
 int read_tasks(context_t *ctx)
 {
 	struct task_struct *task, *tmp;
@@ -828,6 +897,9 @@ int read_tasks(context_t *ctx)
 
 		start += task->ti.cpt_next;
 		show_task_cont(ctx, task);
+
+		if (task_read_aux_pos(ctx, task))
+			return -1;
 	}
 	pr_read_end();
 
