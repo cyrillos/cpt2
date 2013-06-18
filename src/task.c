@@ -847,6 +847,31 @@ unknown_obj:
 	return -1;
 }
 
+static int validate_task_early(context_t *ctx, struct task_struct *t)
+{
+	if (!t->ti.cpt_64bit) {
+		pr_err("Unsupported IA32 task (pid %d comm %s) at @%li\n",
+		       t->ti.cpt_pid, t->ti.cpt_comm,
+		       (long)obj_of(t)->o_pos);
+		return -1;
+	}
+
+	/*
+	 * At least GPR and FPU must be present.
+	 */
+	if (!t->aux_pos.off_gpr || (!t->aux_pos.off_xsave && !t->aux_pos.off_fxsave)) {
+		pr_err("Incomplete/corrupted data (%li %li %li) in task "
+		       "(pid %d comm %s) at @%li\n",
+		       t->aux_pos.off_gpr, t->aux_pos.off_xsave,
+		       t->aux_pos.off_fxsave,
+		       t->ti.cpt_pid, t->ti.cpt_comm,
+		       (long)obj_of(t)->o_pos);
+		return -1;
+	}
+
+	return 0;
+}
+
 int read_tasks(context_t *ctx)
 {
 	struct task_struct *task, *tmp;
@@ -874,16 +899,6 @@ int read_tasks(context_t *ctx)
 
 		obj_set_eos(task->ti.cpt_comm);
 
-		/*
-		 * Exit early if there is 32bit task
-		 */
-		if (!task->ti.cpt_64bit) {
-			pr_err("IA32 task (pid %d comm %s) at %li\n",
-			       task->ti.cpt_pid, task->ti.cpt_comm, (long)start);
-			obj_free_to(task);
-			return -1;
-		}
-
 		hash_add(pids_hash, &task->hash, task->ti.cpt_pid);
 		list_add_tail(&task->list, &task_list);
 
@@ -898,7 +913,8 @@ int read_tasks(context_t *ctx)
 		start += task->ti.cpt_next;
 		show_task_cont(ctx, task);
 
-		if (task_read_aux_pos(ctx, task))
+		if (task_read_aux_pos(ctx, task) ||
+		    validate_task_early(ctx, task))
 			return -1;
 	}
 	pr_read_end();
