@@ -802,6 +802,16 @@ int read_tasks(context_t *ctx)
 			return -1;
 		}
 
+		/*
+		 * Exit early if there is 32bit task
+		 */
+		if (!task->ti.cpt_64bit) {
+			pr_err("IA32 task (pid %d comm %s) at %li\n",
+			       task->ti.cpt_pid, task->ti.cpt_comm, (long)start);
+			obj_free_to(task);
+			return -1;
+		}
+
 		hash_add(pids_hash, &task->hash, task->ti.cpt_pid);
 		list_add_tail(&task->list, &task_list);
 
