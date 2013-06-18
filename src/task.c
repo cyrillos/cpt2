@@ -802,6 +802,8 @@ int read_tasks(context_t *ctx)
 			return -1;
 		}
 
+		obj_set_eos(task->ti.cpt_comm);
+
 		/*
 		 * Exit early if there is 32bit task
 		 */
