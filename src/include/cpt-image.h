@@ -87,6 +87,7 @@ enum _cpt_object_type {
 	CPT_OBJ_EVENTFD,
 	CPT_OBJ_NET_BR,
 	CPT_OBJ_NET_BR_DEV,
+	CPT_OBJ_MOUNT_DATA,
 	CPT_OBJ_POSIX_TIMER,
 
 	CPT_OBJ_NET_TAP_FILTER		= 0x01000000,
@@ -1464,12 +1465,16 @@ struct cpt_posix_timer_image {
 	__u32				cpt_timer_overrun;
 	__u32				cpt_timer_overrun_last;
 	__u32				cpt_timer_signal_pending;
+	__u32				__cpt_pad1;
 	__u64				cpt_timer_interval;
 	__u64				cpt_timer_value;
 
 	__u64				cpt_sigev_value;
 	__u32				cpt_sigev_signo;
 	__u32				cpt_sigev_notify;
+	__u32				cpt_sigev_notify_tid;
+	__u32				__cpt_pad2;
+	__u64				cpt_dump_time;
 } __cpt_aligned;
 
 struct cpt_netdev_image {
