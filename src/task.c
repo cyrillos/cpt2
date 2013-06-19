@@ -895,6 +895,18 @@ static int validate_task_early(context_t *ctx, struct task_struct *t)
 		return -1;
 	}
 
+	/*
+	 * Make sure the task is in state we can deal with.
+	 */
+	if (task_is_stopped(t->ti.cpt_state)) {
+		pr_err("Stopped tasks are not supported yet\n");
+		return -1;
+	} else if (!task_is_running(t->ti.cpt_state) &&
+		   !task_is_zombie(t->ti.cpt_state)) {
+		pr_err("Task is in unsupported state\n");
+		return -1;
+	}
+
 	return 0;
 }
 

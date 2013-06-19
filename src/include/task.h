@@ -66,6 +66,21 @@ struct task_struct {
 	struct cpt_task_image	ti;
 };
 
+static inline bool task_is_zombie(unsigned long state)
+{
+	return !!(state & (EXIT_ZOMBIE | EXIT_DEAD));
+}
+
+static inline bool task_is_stopped(unsigned long state)
+{
+	return !!(state & TASK_STOPPED);
+}
+
+static inline bool task_is_running(unsigned long state)
+{
+	return !!(state & TASK_NORMAL);
+}
+
 extern int read_tasks(context_t *ctx);
 extern int write_pstree(context_t *ctx);
 extern int write_task_images(context_t *ctx);
