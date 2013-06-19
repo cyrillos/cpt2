@@ -52,6 +52,84 @@ struct task_struct *task_lookup_pid(u32 pid)
 	return NULL;
 }
 
+static int read_core_fpu(context_t *ctx, struct task_struct *t, CoreEntry *core)
+{
+	struct xsave_struct xsave;
+	struct cpt_obj_bits bits;
+
+#define __copy_fpu_state()								\
+	do {										\
+		core->thread_info->fpregs->cwd		= xsave.i387.cwd;		\
+		core->thread_info->fpregs->swd		= xsave.i387.swd;		\
+		core->thread_info->fpregs->twd		= xsave.i387.twd;		\
+		core->thread_info->fpregs->fop		= xsave.i387.fop;		\
+		core->thread_info->fpregs->rip		= xsave.i387.rip;		\
+		core->thread_info->fpregs->rdp		= xsave.i387.rdp;		\
+		core->thread_info->fpregs->mxcsr	= xsave.i387.mxcsr;		\
+		core->thread_info->fpregs->mxcsr_mask	= xsave.i387.mxcsr_mask;	\
+											\
+		memcpy(core->thread_info->fpregs->st_space,				\
+		       xsave.i387.st_space, sizeof(xsave.i387.st_space));		\
+		memcpy(core->thread_info->fpregs->xmm_space,				\
+		       xsave.i387.xmm_space, sizeof(xsave.i387.xmm_space));		\
+	} while (0)
+
+	if (t->aux_pos.off_fxsave) {
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_BITS, &bits, t->aux_pos.off_fxsave)) {
+			pr_err("Can't read task fxsave at @%li\n", (long)t->aux_pos.off_fxsave);
+			return -1;
+		}
+
+		if (bits.cpt_size != sizeof(xsave.i387)) {
+			pr_err("Inconsistent fxsave frame size %d(%d) at @%li\n",
+			       (int)bits.cpt_size, (int)sizeof(xsave.i387),
+			       (long)t->aux_pos.off_fxsave);
+			return -1;
+		}
+
+		if (read_data(ctx->fd, &xsave.i387, sizeof(xsave.i387), false)) {
+			pr_err("Can't read bits at %li\n", (long)t->aux_pos.off_fxsave);
+			return -1;
+		}
+
+		__copy_fpu_state();
+
+		/*
+		 * Don't forget to drop xsave frame, it can't be
+		 * two frames in one pass.
+		 */
+		core->thread_info->fpregs->xsave = NULL;
+	} else if (t->aux_pos.off_xsave) {
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_BITS, &bits, t->aux_pos.off_xsave)) {
+			pr_err("Can't read task xsave at @%li\n", (long)t->aux_pos.off_xsave);
+			return -1;
+		}
+
+		if (bits.cpt_size != sizeof(xsave)) {
+			pr_err("Inconsistent xsave frame size %d(%d) at @%li\n",
+			       (int)bits.cpt_size, (int)sizeof(xsave),
+			       (long)t->aux_pos.off_xsave);
+			return -1;
+		}
+
+		if (read_data(ctx->fd, &xsave, sizeof(xsave), false)) {
+			pr_err("Can't read bits at @%li\n", (long)t->aux_pos.off_xsave);
+			return -1;
+		}
+
+		__copy_fpu_state();
+
+		core->thread_info->fpregs->xsave->xstate_bv = xsave.xsave_hdr.xstate_bv;
+
+		memcpy(core->thread_info->fpregs->xsave->ymmh_space,
+		       xsave.ymmh.ymmh_space, sizeof(xsave.ymmh.ymmh_space));
+	} else
+		BUG();
+
+	return 0;
+#undef __copy_fpu_state
+}
+
 static u32 decode_segment(u32 segno)
 {
 	if (segno == CPT_SEG_ZERO)
@@ -96,180 +174,76 @@ static void adjust_syscall_ret(UserX86RegsEntry *gpregs)
 
 }
 
+static int read_core_gpr(context_t *ctx, struct task_struct *t, CoreEntry *core)
+{
+	struct cpt_x86_64_regs regs;
+
+	if (read_obj_cpt(ctx->fd, CPT_OBJ_X86_64_REGS, &regs, t->aux_pos.off_gpr)) {
+		pr_err("Can't read task registers at @%li\n", (long)t->aux_pos.off_gpr);
+		return -1;
+	}
+
+	core->thread_info->gpregs->r15		= regs.cpt_r15;
+	core->thread_info->gpregs->r14		= regs.cpt_r14;
+	core->thread_info->gpregs->r13		= regs.cpt_r13;
+	core->thread_info->gpregs->r12		= regs.cpt_r12;
+	core->thread_info->gpregs->bp		= regs.cpt_rbp;
+	core->thread_info->gpregs->bx		= regs.cpt_rbx;
+	core->thread_info->gpregs->r11		= regs.cpt_r11;
+	core->thread_info->gpregs->r10		= regs.cpt_r10;
+	core->thread_info->gpregs->r9		= regs.cpt_r9;
+	core->thread_info->gpregs->r8		= regs.cpt_r8;
+	core->thread_info->gpregs->ax		= regs.cpt_rax;
+	core->thread_info->gpregs->cx		= regs.cpt_rcx;
+	core->thread_info->gpregs->dx		= regs.cpt_rdx;
+	core->thread_info->gpregs->si		= regs.cpt_rsi;
+	core->thread_info->gpregs->di		= regs.cpt_rdi;
+	core->thread_info->gpregs->orig_ax	= regs.cpt_orig_rax;
+	core->thread_info->gpregs->ip		= regs.cpt_rip;
+	core->thread_info->gpregs->cs		= decode_segment(regs.cpt_cs);
+	core->thread_info->gpregs->flags	= regs.cpt_eflags;
+	core->thread_info->gpregs->sp		= regs.cpt_rsp;
+	core->thread_info->gpregs->ss		= decode_segment(regs.cpt_ss);
+	core->thread_info->gpregs->fs_base	= regs.cpt_fsbase;
+	core->thread_info->gpregs->gs_base	= regs.cpt_gsbase;
+	core->thread_info->gpregs->ds		= decode_segment(regs.cpt_ds);
+	core->thread_info->gpregs->es		= decode_segment(regs.cpt_es);
+	core->thread_info->gpregs->fs		= decode_segment(regs.cpt_fsindex);
+	core->thread_info->gpregs->gs		= decode_segment(regs.cpt_gsindex);
+
+	adjust_syscall_ret(core->thread_info->gpregs);
+	return 0;
+}
+
 static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core)
 {
-	union {
-		struct cpt_object_hdr		h;
-		struct cpt_obj_bits		bits;
-		struct cpt_x86_64_regs		regs;
-		struct cpt_task_aux_image	aux;
-		struct cpt_signal_image		sig;
-	} u;
+	if (read_core_gpr(ctx, t, core))
+		return -1;
 
-	struct xsave_struct xsave;
+	if (read_core_fpu(ctx, t, core))
+		return -1;
 
-	off_t start;
-	int ret = -1;
+	/*
+	 * Futexes are small one, read them right here.
+	 */
+	if (t->aux_pos.off_futex) {
+		struct cpt_task_aux_image aux;
 
-#define __copy_fpu_state()								\
-	do {										\
-		core->thread_info->fpregs->cwd		= xsave.i387.cwd;		\
-		core->thread_info->fpregs->swd		= xsave.i387.swd;		\
-		core->thread_info->fpregs->twd		= xsave.i387.twd;		\
-		core->thread_info->fpregs->fop		= xsave.i387.fop;		\
-		core->thread_info->fpregs->rip		= xsave.i387.rip;		\
-		core->thread_info->fpregs->rdp		= xsave.i387.rdp;		\
-		core->thread_info->fpregs->mxcsr	= xsave.i387.mxcsr;		\
-		core->thread_info->fpregs->mxcsr_mask	= xsave.i387.mxcsr_mask;	\
-											\
-		memcpy(core->thread_info->fpregs->st_space,				\
-		       xsave.i387.st_space, sizeof(xsave.i387.st_space));		\
-		memcpy(core->thread_info->fpregs->xmm_space,				\
-		       xsave.i387.xmm_space, sizeof(xsave.i387.xmm_space));		\
-	} while (0)
-
-	for (start = obj_of(t)->o_pos + t->ti.cpt_hdrlen;
-	     start < obj_of(t)->o_pos + t->ti.cpt_next;
-	     start += u.h.cpt_next) {
-		if (read_obj_cpt(ctx->fd, -1, &u.h, start)) {
-			pr_err("Can't read task data header at %li\n", (long)start);
-			goto out;
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_TASK_AUX, &aux, t->aux_pos.off_futex)) {
+			pr_err("Can't read task futexes at @%li\n", (long)t->aux_pos.off_futex);
+			return -1;
 		}
 
-		if (u.h.cpt_object == CPT_OBJ_BITS) {
-			if (read_obj_cpt_cont(ctx->fd, &u.bits)) {
-				pr_err("Can't read bits at %li\n", (long)start);
-				goto out;
-			}
-			switch (u.h.cpt_content) {
-			case CPT_CONTENT_STACK:
-				/* FIXME Not in criu */
-				continue;
-			case CPT_CONTENT_X86_FPUSTATE:
-				if (u.bits.cpt_size != sizeof(xsave.i387)) {
-					pr_err("Inconsistent fxsave frame "
-					       "size %d(%d) at %li\n",
-					       (int)u.bits.cpt_size, (int)sizeof(xsave.i387),
-					       (long)start);
-					goto out;
-				}
-				if (read_data(ctx->fd, &xsave.i387, sizeof(xsave.i387), false)) {
-					pr_err("Can't read bits at %li\n", (long)start);
-					goto out;
-				}
-
-				__copy_fpu_state();
-
-				/*
-				 * Don't forget to drop xsave frame, it can't be
-				 * two frames in one pass.
-				 */
-				core->thread_info->fpregs->xsave = NULL;
-
-				break;
-			case CPT_CONTENT_X86_XSAVE:
-				if (!core->thread_info->fpregs->xsave) {
-					pr_err("Dump corrupted, two FPU frames detected "
-					       "while only one is allowed at %li\n", (long)start);
-					goto out;
-				}
-				if (u.bits.cpt_size != sizeof(xsave)) {
-					pr_err("Inconsistent xsave frame "
-					       "size %d(%d) at %li\n",
-					       (int)u.bits.cpt_size, (int)sizeof(xsave),
-					       (long)start);
-					goto out;
-				}
-				if (read_data(ctx->fd, &xsave, sizeof(xsave), false)) {
-					pr_err("Can't read bits at %li\n", (long)start);
-					goto out;
-				}
-
-				__copy_fpu_state();
-
-				core->thread_info->fpregs->xsave->xstate_bv = xsave.xsave_hdr.xstate_bv;
-
-				memcpy(core->thread_info->fpregs->xsave->ymmh_space,
-				       xsave.ymmh.ymmh_space, sizeof(xsave.ymmh.ymmh_space));
-
-				break;
-			default:
-				goto unknown_obj;
-			}
-		} else if (u.h.cpt_object == CPT_OBJ_X86_64_REGS) {
-			if (read_obj_cpt_cont(ctx->fd, &u.regs)) {
-				pr_err("Can't read task registers at %li\n", (long)start);
-				goto out;
-			}
-
-			core->thread_info->gpregs->r15		= u.regs.cpt_r15;
-			core->thread_info->gpregs->r14		= u.regs.cpt_r14;
-			core->thread_info->gpregs->r13		= u.regs.cpt_r13;
-			core->thread_info->gpregs->r12		= u.regs.cpt_r12;
-			core->thread_info->gpregs->bp		= u.regs.cpt_rbp;
-			core->thread_info->gpregs->bx		= u.regs.cpt_rbx;
-			core->thread_info->gpregs->r11		= u.regs.cpt_r11;
-			core->thread_info->gpregs->r10		= u.regs.cpt_r10;
-			core->thread_info->gpregs->r9		= u.regs.cpt_r9;
-			core->thread_info->gpregs->r8		= u.regs.cpt_r8;
-			core->thread_info->gpregs->ax		= u.regs.cpt_rax;
-			core->thread_info->gpregs->cx		= u.regs.cpt_rcx;
-			core->thread_info->gpregs->dx		= u.regs.cpt_rdx;
-			core->thread_info->gpregs->si		= u.regs.cpt_rsi;
-			core->thread_info->gpregs->di		= u.regs.cpt_rdi;
-			core->thread_info->gpregs->orig_ax	= u.regs.cpt_orig_rax;
-			core->thread_info->gpregs->ip		= u.regs.cpt_rip;
-			core->thread_info->gpregs->cs		= decode_segment(u.regs.cpt_cs);
-			core->thread_info->gpregs->flags	= u.regs.cpt_eflags;
-			core->thread_info->gpregs->sp		= u.regs.cpt_rsp;
-			core->thread_info->gpregs->ss		= decode_segment(u.regs.cpt_ss);
-			core->thread_info->gpregs->fs_base	= u.regs.cpt_fsbase;
-			core->thread_info->gpregs->gs_base	= u.regs.cpt_gsbase;
-			core->thread_info->gpregs->ds		= decode_segment(u.regs.cpt_ds);
-			core->thread_info->gpregs->es		= decode_segment(u.regs.cpt_es);
-			core->thread_info->gpregs->fs		= decode_segment(u.regs.cpt_fsindex);
-			core->thread_info->gpregs->gs		= decode_segment(u.regs.cpt_gsindex);
-
-			adjust_syscall_ret(core->thread_info->gpregs);
-
-		} else if (u.h.cpt_object == CPT_OBJ_TASK_AUX) {
-			if (read_obj_cpt_cont(ctx->fd, &u.aux)) {
-				pr_err("Can't read task aux data at %li\n", (long)start);
-				goto out;
-			}
-			/* See note at FUTEX_RLA_LEN definition */
-			core->thread_core->futex_rla		= u.aux.cpt_robust_list;
-			core->thread_core->futex_rla_len	= FUTEX_RLA_LEN;
-		} else if (u.h.cpt_object == CPT_OBJ_SIGNAL_STRUCT) {
-			/* FIXME Implement */
-			continue;
-		} else if (u.h.cpt_object == CPT_OBJ_LASTSIGINFO) {
-			/* FIXME Not in criu */
-			continue;
-		} else if (u.h.cpt_object == CPT_OBJ_SIGALTSTACK) {
-			/* FIXME Not in criu */
-			continue;
-		} else if (u.h.cpt_object == CPT_OBJ_SIGINFO) {
-			/*
-			 * FIXME Implement
-			 * First stands for dump_sigqueue(&tsk->pending, ctx);
-			 * Second for last_thread, dump_one_signal_struct(tg_obj, ctx);
-			 * dump_sigqueue(&sig->shared_pending, ctx);
-			 */
-			continue;
-		} else
-			goto unknown_obj;
+		/* See note at FUTEX_RLA_LEN definition */
+		core->thread_core->futex_rla		= aux.cpt_robust_list;
+		core->thread_core->futex_rla_len	= FUTEX_RLA_LEN;
 	}
-	ret = 0;
-out:
-	return ret;
 
-unknown_obj:
-	pr_err("Unexpected object %d at %li\n",
-	       u.h.cpt_object, (long)start);
-	goto out;
+	/*
+	 * FIXME Please make sure all t->aux_pos are covered
+	 */
 
-#undef __copy_fpu_state
+	return 0;
 }
 
 /*
