@@ -15,6 +15,12 @@
 
 #include "protobuf.h"
 #include "protobuf/sa.pb-c.h"
+#include "protobuf/siginfo.pb-c.h"
+
+int write_signal_queues(context_t *ctx, struct task_struct *t)
+{
+	return 0;
+}
 
 int write_sighandlers(context_t *ctx, struct task_struct *t)
 {

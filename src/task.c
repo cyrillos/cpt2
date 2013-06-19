@@ -560,6 +560,13 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 		goto out;
 	}
 
+	ret = write_signal_queues(ctx, t);
+	if (ret) {
+		pr_err("Failed writing signal queues for task %d\n",
+		       t->ti.cpt_pid);
+		goto out;
+	}
+
 	ret = write_timers(ctx, t);
 	if (ret) {
 		pr_err("Failed writing timers for task %d\n",
