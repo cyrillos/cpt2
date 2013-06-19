@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
+#include "task-states.h"
 #include "cpt-image.h"
 #include "context.h"
 #include "list.h"
