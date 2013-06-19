@@ -8,14 +8,7 @@
 #include "cpt-image.h"
 #include "context.h"
 #include "list.h"
-
-/*
- * Task states CRIU understands.
- */
-#define CRIU_TASK_ALIVE		0x1
-#define CRIU_TASK_DEAD		0x2
-#define CRIU_TASK_STOPPED	0x3
-#define CRIU_TASK_HELPER	0x4
+#include "bug.h"
 
 /*
  * Offsets associated with task, they lays right
@@ -79,6 +72,21 @@ static inline bool task_is_stopped(unsigned long state)
 static inline bool task_is_running(unsigned long state)
 {
 	return !!(state & TASK_NORMAL);
+}
+
+/*
+ * Task states CRIU understands.
+ */
+#define CRIU_TASK_ALIVE		0x1
+#define CRIU_TASK_DEAD		0x2
+#define CRIU_TASK_STOPPED	0x3
+#define CRIU_TASK_HELPER	0x4
+
+static inline unsigned int encode_task_state(unsigned long state)
+{
+	BUG_ON(task_is_stopped(state));
+
+	return task_is_zombie(state) ? CRIU_TASK_DEAD : CRIU_TASK_ALIVE;
 }
 
 extern int read_tasks(context_t *ctx);

@@ -301,12 +301,7 @@ static int write_task_core(context_t *ctx, struct task_struct *t)
 			goto out;
 	}
 
-	/*
-	 * FIXME For a while set it as CRIU_TASK_ALIVE
-	 */
-
-	/* tc.task_state			= t->ti.cpt_state; */
-	tc.task_state			= CRIU_TASK_ALIVE;
+	tc.task_state			= encode_task_state(t->ti.cpt_state);
 	tc.exit_code			= t->ti.cpt_exit_code;
 	tc.personality			= t->ti.cpt_personality;
 	tc.flags			= t->ti.cpt_flags;
