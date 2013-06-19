@@ -744,6 +744,38 @@ void free_tasks(context_t *ctx)
 		obj_free_to(task);
 }
 
+static const char * const task_state_array[] = {
+	"R (running)",		/*   0 */
+	"S (sleeping)",		/*   1 */
+	"D (disk sleep)",	/*   2 */
+	"T (stopped)",		/*   4 */
+	"t (tracing stop)",	/*   8 */
+	"Z (zombie)",		/*  16 */
+	"X (dead)",		/*  32 */
+	"x (dead)",		/*  64 */
+	"K (wakekill)",		/* 128 */
+	"W (waking)",		/* 256 */
+	"P (parked)",		/* 512 */
+};
+
+static inline const char *get_task_state(struct task_struct *t)
+{
+	const char * const *p = &task_state_array[0];
+	struct cpt_task_image *ti = &t->ti;
+	unsigned int state;
+
+	BUILD_BUG_ON(1 + ilog2(TASK_STATE_MAX) != ARRAY_SIZE(task_state_array));
+
+	state = (ti->cpt_state & (TASK_REPORT | EXIT_ZOMBIE | EXIT_DEAD));
+
+	while (state) {
+		p++;
+		state >>= 1;
+	}
+
+	return *p;
+}
+
 static void show_task_cont(context_t *ctx, struct task_struct *t)
 {
 	struct cpt_task_image *ti = &t->ti;
@@ -751,13 +783,14 @@ static void show_task_cont(context_t *ctx, struct task_struct *t)
 	pr_debug("\t@%-8li pid %6d tgid %6d ppid %6d rppid %6d pgrp %6d\n"
 		 "\t\tcomm '%s' session %d leader %d 64bit %d\n"
 		 "\t\tmm @%-8ld files @%-8ld fs @%-8ld signal @%-8ld\n"
-		 "\t\tstate @%-8ld exit_code @%-8ld posix_timers @%-8ld\n",
+		 "\t\tstate @%-8ld exit_code @%-8ld posix_timers @%-8ld\n"
+		 "\t\t\t%s\n",
 		 (long)obj_of(t)->o_pos, ti->cpt_pid, ti->cpt_tgid, ti->cpt_ppid,
 		 ti->cpt_rppid, ti->cpt_pgrp, ti->cpt_comm, ti->cpt_session,
 		 ti->cpt_leader,ti->cpt_64bit, (long)ti->cpt_mm,
 		 (long)ti->cpt_files, (long)ti->cpt_fs, (long)ti->cpt_signal,
 		 (long)ti->cpt_state, (long)ti->cpt_exit_code,
-		 (long)ti->cpt_posix_timers);
+		 (long)ti->cpt_posix_timers, get_task_state(t));
 }
 
 static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
