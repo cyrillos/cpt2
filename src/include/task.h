@@ -10,6 +10,14 @@
 #include "list.h"
 
 /*
+ * Task states CRIU understands.
+ */
+#define CRIU_TASK_ALIVE		0x1
+#define CRIU_TASK_DEAD		0x2
+#define CRIU_TASK_STOPPED	0x3
+#define CRIU_TASK_HELPER	0x4
+
+/*
  * Offsets associated with task, they lays right
  * after task image, in the order we bullet below.
  */
