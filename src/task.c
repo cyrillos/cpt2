@@ -820,6 +820,17 @@ static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
 			goto unknown_obj;
 		}
 	}
+
+	pr_debug("\t\t\toffs: @%-8li @%-8li @%-8li @%-8li\n"
+		 "\t\t\t      @%-8li @%-8li @%-8li @%-8li\n"
+		 "\t\t\t      @%-8li @%-8li @%-8li\n",
+		 (long)t->aux_pos.off_kstack, (long)t->aux_pos.off_gpr,
+		 (long)t->aux_pos.off_xsave, (long)t->aux_pos.off_fsave,
+		 (long)t->aux_pos.off_fxsave, (long)t->aux_pos.off_lastsiginfo,
+		 (long)t->aux_pos.off_sigaltstack, (long)t->aux_pos.off_futex,
+		 (long)t->aux_pos.off_sig_priv_pending, (long)t->aux_pos.off_signal,
+		 (long)t->aux_pos.off_sig_share_pending);
+
 	return 0;
 
 unknown_obj:
