@@ -48,16 +48,68 @@ struct task_aux_pos {
 struct task_struct {
 	struct hlist_node	hash;
 	struct task_struct	*parent;
+	struct task_struct	*real_parent;
 
-	struct list_head	list;
-	struct list_head	children;
-	struct list_head	threads;
-	unsigned int		n_threads;
+	struct list_head	flat;		/* flat view, read from image */
+
+	struct list_head	tasks;		/* linkage for init_task */
+
+	struct list_head	children;	/* list of my children */
+	struct list_head	sibling;	/* linkage in my parent's children list */
+
+	struct task_struct	*group_leader;
+	struct list_head	thread_group;	/* list of my threads */
+
+	unsigned int		nr_threads;	/* to speedup threads counting */
 
 	struct task_aux_pos	aux_pos;
 
 	struct cpt_task_image	ti;
 };
+
+extern struct task_struct *root_task;
+extern struct task_struct init_task;
+
+static inline struct task_struct *
+next_thread(const struct task_struct *p)
+{
+	return list_entry(p->thread_group.next,
+			  struct task_struct,
+			  thread_group);
+}
+
+static inline struct task_struct *
+next_task(const struct task_struct *p)
+{
+	return list_entry(p->tasks.next,
+			  struct task_struct,
+			  tasks);
+}
+
+#define for_each_process(p)				\
+	for (p = &init_task;				\
+	     (p = next_task(p)) != &init_task; )
+
+/*
+ * Careful: do_each_thread/while_each_thread is a double loop so
+ *          'break' will not work as expected - use goto instead.
+ */
+#define do_each_thread(g, t)				\
+	for (g = t = &init_task;			\
+	     (g = t = next_task(g)) != &init_task; ) do
+
+#define while_each_thread(g, t)				\
+	while ((t = next_thread(t)) != g)
+
+static inline int thread_group_empty(struct task_struct *p)
+{
+	return list_empty(&p->thread_group);
+}
+
+static inline bool thread_group_leader(struct task_struct *p)
+{
+	return p->ti.cpt_pid == p->ti.cpt_tgid;
+}
 
 static inline bool task_is_zombie(unsigned long state)
 {
@@ -93,7 +145,5 @@ extern int read_tasks(context_t *ctx);
 extern int write_pstree(context_t *ctx);
 extern int write_task_images(context_t *ctx);
 extern void free_tasks(context_t *ctx);
-
-extern struct task_struct *root_task;
 
 #endif /* __CPT2_TASK_H__ */

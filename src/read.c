@@ -273,6 +273,16 @@ int read_dumpfile(context_t *ctx)
 	if (parse_sections(ctx))
 		return -1;
 
+#if 0
+	/*
+	 * To debug process tree creation.
+	 */
+	if (read_tasks(ctx))
+		return -1;
+	write_pstree(ctx);
+	exit(1);
+#endif
+
 	if (read_ns(ctx))
 		return -1;
 

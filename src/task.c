@@ -33,8 +33,24 @@
 #include "protobuf/core.pb-c.h"
 #include "protobuf/sa.pb-c.h"
 
-static unsigned int max_threads;
-static LIST_HEAD(task_list);
+static unsigned int max_threads = 1;
+
+/*
+ * This init task is served only for linkage of the
+ * process tree, thus never dump or convert it to some
+ * CRIU image.
+ */
+struct task_struct init_task = {
+	.parent			= &init_task,
+	.real_parent		= &init_task,
+	.tasks			= LIST_HEAD_INIT(init_task.tasks),
+	.children		= LIST_HEAD_INIT(init_task.children),
+	.sibling		= LIST_HEAD_INIT(init_task.sibling),
+	.group_leader		= &init_task,
+	.thread_group		= LIST_HEAD_INIT(init_task.thread_group),
+	.nr_threads		= 1,
+};
+
 struct task_struct *root_task;
 
 #define PID_HASH_BITS		10
@@ -499,6 +515,19 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 {
 	int ret;
 
+	ret = write_task_core(ctx, t);
+	if (ret) {
+		pr_err("Failed writing core for task %d\n",
+		       t->ti.cpt_pid);
+		goto out;
+	}
+
+	/*
+	 * Nothing else for zombie tasks.
+	 */
+	if (task_is_zombie(t->ti.cpt_state))
+		return 0;
+
 	ret = write_task_rlimits(ctx, t);
 	if (ret) {
 		pr_err("Failed writing rlimits for task %d\n",
@@ -530,13 +559,6 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 	ret = write_pages(ctx, t->ti.cpt_pid, t->ti.cpt_mm);
 	if (ret) {
 		pr_err("Failed writing vmas for task %d\n",
-		       t->ti.cpt_pid);
-		goto out;
-	}
-
-	ret = write_task_core(ctx, t);
-	if (ret) {
-		pr_err("Failed writing core for task %d\n",
 		       t->ti.cpt_pid);
 		goto out;
 	}
@@ -601,72 +623,15 @@ out:
 	return ret;
 }
 
-int __write_all_task_images(context_t *ctx, struct task_struct *t)
-{
-	int ret;
-
-	ret = __write_task_images(ctx, t);
-	if (!ret) {
-		struct task_struct *child;
-
-		list_for_each_entry(child, &t->children, list) {
-			ret = __write_all_task_images(ctx, child);
-			if (ret)
-				goto out;
-		}
-	}
-out:
-	return ret;
-}
-
 int write_task_images(context_t *ctx)
 {
-	struct task_struct *t;
+	struct task_struct *p;
 	int ret = 0;
 
-	list_for_each_entry(t, &task_list, list) {
-		ret = __write_all_task_images(ctx, t);
+	for_each_process(p) {
+		ret = __write_task_images(ctx, p);
 		if (ret)
-			goto out;
-	}
-out:
-	return ret;
-}
-
-static int __write_pstree_items(int fd, struct task_struct *t,
-				PstreeEntry *e, void *threads_buf,
-				unsigned int nr_max)
-{
-	struct task_struct *thread;
-	unsigned int i = 0;
-	int ret = 0;
-
-	pstree_entry__init(e);
-
-	e->pid		= t->ti.cpt_pid;
-	e->ppid		= t->ti.cpt_ppid;
-	e->pgid		= t->ti.cpt_pgrp;
-	e->sid		= t->ti.cpt_session;
-	e->threads	= threads_buf;
-	e->n_threads	= t->n_threads + 1;
-
-	e->threads[i++] = t->ti.cpt_pid;
-
-	list_for_each_entry(thread, &t->threads, list) {
-		BUG_ON(i >= nr_max);
-		e->threads[i++] = thread->ti.cpt_pid;
-	}
-
-	ret = pb_write_one(fd, e, PB_PSTREE);
-	if (!ret) {
-		struct task_struct *child;
-
-		list_for_each_entry(child, &t->children, list) {
-			ret = __write_pstree_items(fd, child, e,
-						   threads_buf, nr_max);
-			if (ret)
-				break;
-		}
+			break;
 	}
 
 	return ret;
@@ -674,61 +639,157 @@ static int __write_pstree_items(int fd, struct task_struct *t,
 
 int write_pstree(context_t *ctx)
 {
-	struct task_struct *task;
-	int pstree_fd = -1, ret = 0;
-	PstreeEntry e;
-	void *threads;
+	PstreeEntry e = PSTREE_ENTRY__INIT;
+	struct task_struct *p, *t;
+	unsigned int i;
+	int fd = -1;
+	int ret = 0;
+	void *tbuf;
 
-	threads = xmalloc(sizeof(e.threads[0]) * (max_threads + 1));
-	if (!threads)
+	tbuf = xmalloc(sizeof(e.threads[0]) * (max_threads));
+	if (!tbuf)
 		return -1;
 
-	pstree_fd = open_image(ctx, CR_FD_PSTREE, O_DUMP);
-	if (pstree_fd < 0) {
+	e.threads = tbuf;
+
+	fd = open_image(ctx, CR_FD_PSTREE, O_DUMP);
+	if (fd < 0) {
 		ret = -1;
-		goto out;
+		goto err;
 	}
 
-	list_for_each_entry(task, &task_list, list) {
-		ret = __write_pstree_items(pstree_fd, task, &e,
-					   threads, max_threads);
+	for_each_process(p) {
+		i = 0;
+
+		e.pid		= p->ti.cpt_pid;
+		e.ppid		= p->ti.cpt_ppid;
+		e.pgid		= p->ti.cpt_pgrp;
+		e.sid		= p->ti.cpt_session;
+		e.n_threads	= p->nr_threads;
+		e.threads[i++]	= p->ti.cpt_pid;
+
+		t = p;
+		while_each_thread(p, t) {
+			if (unlikely(i >= max_threads)) {
+				pr_err("Threads overflow in task %d thread %d (%d %d)\n",
+				       p->ti.cpt_pid, t->ti.cpt_pid, i, max_threads);
+				ret = -1;
+				goto err;
+			}
+			e.threads[i++] = t->ti.cpt_pid;
+		}
+
+		ret = pb_write_one(fd, &e, PB_PSTREE);
 		if (ret)
 			break;
 	}
 
-out:
-	close_safe(&pstree_fd);
-	xfree(threads);
+err:
+	close_safe(&fd);
+	xfree(tbuf);
 	return ret;
 }
 
-static void connect_task(struct task_struct *task)
+static void show_process_tree()
 {
-	struct task_struct *t;
+	struct task_struct *p, *t;
 
-	/*
-	 * We don't care if there is some of PIDs
-	 * are screwed, the crtools will refuse to
-	 * restore if someone pass us coeeupted data.
-	 *
-	 * Thus we only collect threads and children.
-	 */
-	t = task_lookup_pid(task->ti.cpt_ppid);
-	if (t) {
-		task->parent = t;
-		list_move(&task->list, &t->children);
+	if (wont_print(LOG_DEBUG))
 		return;
+
+	pr_debug("Built process tree\n");
+	pr_debug("------------------------------\n");
+	for_each_process(p) {
+		pr_debug("\tpid %6d ppid %6d tgid %6d\n",
+			 p->ti.cpt_pid, p->ti.cpt_ppid,
+			 p->ti.cpt_tgid);
+		t = p;
+		while_each_thread(p, t) {
+			pr_debug("\t\tpid %6d ppid %6d tgid %6d\n",
+				 t->ti.cpt_pid, t->ti.cpt_ppid,
+				 t->ti.cpt_tgid);
+		}
+	}
+	pr_debug("------------------------------\n");
+}
+
+/*
+ * In criu  the process tree is a flat file with all parents
+ * children connected together with threads assigned where needed.
+ * Thus we have to collect all tasks fisrt from the openvz image
+ * file, build a tree and only then we will be able to write converted
+ * results back. The bad news are that we've no guarantee that the data
+ * we're obtaining from the image are valid (we do a minimal check here,
+ * since criu will catch any additional problems by its own).
+ *
+ * FIXME How to handle cpt_rppid, do we consider CLONE_PARENT at all?
+ */
+static int build_process_tree(struct list_head *flat_head)
+{
+	struct task_struct *t, *p, *tmp;
+
+	list_for_each_entry_safe(p, tmp, flat_head, flat) {
+
+		/*
+		 * Real parent won't escape us.
+		 */
+		if (likely(p->ti.cpt_rppid)) {
+			t = task_lookup_pid(p->ti.cpt_rppid);
+			if (!t) {
+				pr_err("Stray task %d without real parent %d\n",
+				       p->ti.cpt_pid, p->ti.cpt_rppid);
+				return -1;
+			}
+			p->real_parent = t;
+		}
+
+		/*
+		 * I'm someone's child, I hope :-)
+		 */
+		if (likely(p->ti.cpt_ppid)) {
+			t = task_lookup_pid(p->ti.cpt_ppid);
+			if (!t) {
+				pr_err("Stray task %d without parent %d\n",
+				       p->ti.cpt_pid, p->ti.cpt_ppid);
+				return -1;
+			}
+
+			p->parent = t;
+		}
+
+		/*
+		 * I'm someone's twin... wait, thread I mean... whatever...
+		 */
+		if (thread_group_leader(p)) {
+			if (p->real_parent)
+				list_add_tail(&p->sibling, &p->real_parent->children);
+			else
+				list_add_tail(&p->sibling, &init_task.children);
+
+			list_add_tail(&p->tasks, &init_task.tasks);
+		} else {
+			t = task_lookup_pid(p->ti.cpt_tgid);
+			if (!t) {
+				pr_err("Stray task %d without thread group %d\n",
+				       p->ti.cpt_pid, p->ti.cpt_tgid);
+				return -1;
+			}
+
+			p->group_leader = t;
+			t->nr_threads++;
+
+			list_add_tail(&p->thread_group, &p->group_leader->thread_group);
+
+			if (p->group_leader->nr_threads > max_threads)
+				max_threads = p->group_leader->nr_threads;
+		}
 	}
 
-	t = task_lookup_pid(task->ti.cpt_rppid);
-	if (t) {
-		list_move(&task->list, &t->threads);
-		t->n_threads++;
+	root_task = next_task(&init_task);
 
-		if (max_threads < t->n_threads)
-			max_threads = t->n_threads;
-		return;
-	}
+	show_process_tree();
+
+	return 0;
 }
 
 void free_tasks(context_t *ctx)
@@ -905,9 +966,31 @@ static int validate_task_early(context_t *ctx, struct task_struct *t)
 	return 0;
 }
 
+static void task_struct_init(struct task_struct *t)
+{
+	INIT_LIST_HEAD(&t->flat);
+
+	INIT_LIST_HEAD(&t->tasks);
+	t->parent = t->real_parent = NULL;
+
+	INIT_LIST_HEAD(&t->sibling);
+	INIT_LIST_HEAD(&t->children);
+
+	/*
+	 * By default I'm thread group leader.
+	 * Precise linkage will be done later.
+	 */
+	INIT_LIST_HEAD(&t->thread_group);
+	t->group_leader = t;
+	t->nr_threads = 1;
+
+	memzero_p(&t->aux_pos);
+}
+
 int read_tasks(context_t *ctx)
 {
-	struct task_struct *task, *tmp;
+	LIST_HEAD(flat_head);
+	struct task_struct *task;
 	off_t start, end;
 
 	pr_read_start("tasks\n");
@@ -917,12 +1000,7 @@ int read_tasks(context_t *ctx)
 		task = obj_alloc_to(struct task_struct, ti);
 		if (!task)
 			return -1;
-		INIT_LIST_HEAD(&task->list);
-		INIT_LIST_HEAD(&task->children);
-		INIT_LIST_HEAD(&task->threads);
-		task->n_threads = 0;
-		task->parent = NULL;
-		memzero_p(&task->aux_pos);
+		task_struct_init(task);
 
 		if (read_obj(ctx->fd, CPT_OBJ_TASK, &task->ti, sizeof(task->ti), start)) {
 			obj_free_to(task);
@@ -933,10 +1011,12 @@ int read_tasks(context_t *ctx)
 		obj_set_eos(task->ti.cpt_comm);
 
 		hash_add(pids_hash, &task->hash, task->ti.cpt_pid);
-		list_add_tail(&task->list, &task_list);
-
+		list_add_tail(&task->flat, &flat_head);
 		obj_push_hash_to(task, CPT_OBJ_TASK, start);
 
+		/*
+		 * A task with minimal PID become a root one.
+		 */
 		if (likely(root_task)) {
 			if (root_task->ti.cpt_pid > task->ti.cpt_pid)
 				root_task = task;
@@ -952,15 +1032,8 @@ int read_tasks(context_t *ctx)
 	}
 	pr_read_end();
 
-	/*
-	 * Create a process tree we will need to dump.
-	 * Because in CRIU protobuf task file there is
-	 * a set of threads associated with every task,
-	 * we've had to collect all tasks first then
-	 * build a process tree.
-	 */
-	list_for_each_entry_safe(task, tmp, &task_list, list)
-		connect_task(task);
+	if (build_process_tree(&flat_head))
+		return -1;
 
 	return 0;
 }
