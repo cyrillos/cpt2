@@ -262,10 +262,7 @@ static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core
 	return 0;
 }
 
-/*
- * No threads yet.
- */
-static int write_task_core(context_t *ctx, struct task_struct *t)
+static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread)
 {
 	ThreadCoreEntry thread_core = THREAD_CORE_ENTRY__INIT;
 	ThreadInfoX86 thread_info = THREAD_INFO_X86__INIT;
@@ -323,6 +320,9 @@ static int write_task_core(context_t *ctx, struct task_struct *t)
 	tc.flags			= t->ti.cpt_flags;
 	tc.blk_sigset			= t->ti.cpt_sigrblocked;
 	tc.comm				= (char *)t->ti.cpt_comm;
+
+	if (is_thread)
+		core.tc = NULL;
 
 	ret = pb_write_one(core_fd, &core, PB_CORE);
 
@@ -513,7 +513,7 @@ static int write_task_rlimits(context_t *ctx, struct task_struct *t)
 
 static int __write_thread_images(context_t *ctx, struct task_struct *t)
 {
-	if (write_task_core(ctx, t)) {
+	if (write_task_core(ctx, t, true)) {
 		pr_err("Failed writing core for thread %d\n",
 		       t->ti.cpt_pid);
 		return -1;
@@ -526,7 +526,7 @@ static int __write_task_images(context_t *ctx, struct task_struct *t)
 {
 	int ret;
 
-	ret = write_task_core(ctx, t);
+	ret = write_task_core(ctx, t, false);
 	if (ret) {
 		pr_err("Failed writing core for task %d\n",
 		       t->ti.cpt_pid);
