@@ -511,6 +511,17 @@ static int write_task_rlimits(context_t *ctx, struct task_struct *t)
 	return ret;
 }
 
+static int __write_thread_images(context_t *ctx, struct task_struct *t)
+{
+	if (write_task_core(ctx, t)) {
+		pr_err("Failed writing core for thread %d\n",
+		       t->ti.cpt_pid);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int __write_task_images(context_t *ctx, struct task_struct *t)
 {
 	int ret;
@@ -625,13 +636,20 @@ out:
 
 int write_task_images(context_t *ctx)
 {
-	struct task_struct *p;
+	struct task_struct *p, *t;
 	int ret = 0;
 
 	for_each_process(p) {
 		ret = __write_task_images(ctx, p);
 		if (ret)
 			break;
+
+		t = p;
+		while_each_thread(p, t) {
+			ret = __write_thread_images(ctx, t);
+			if (ret)
+				break;
+		}
 	}
 
 	return ret;
@@ -641,6 +659,7 @@ int write_pstree(context_t *ctx)
 {
 	PstreeEntry e = PSTREE_ENTRY__INIT;
 	struct task_struct *p, *t;
+	pid_t real_ppid;
 	unsigned int i;
 	int fd = -1;
 	int ret = 0;
@@ -661,8 +680,29 @@ int write_pstree(context_t *ctx)
 	for_each_process(p) {
 		i = 0;
 
+		/*
+		 * CRIU has no idea about in-kernel relationships
+		 * with real-parents and such. The parents are simply
+		 * linked from @children list. Thus even if there was
+		 * fork() called from thread and kernel's parent is the
+		 * thread itself, we need to alternate data writen on
+		 * disk and make a thread group leader to become a parent
+		 * of the task instead.
+		 */
+
+		if (p->ti.cpt_rppid) {
+			BUG_ON(!p->real_parent);
+			BUG_ON(!p->real_parent->group_leader);
+
+			if (!thread_group_leader(p->real_parent))
+				real_ppid = p->real_parent->group_leader->ti.cpt_pid;
+			else
+				real_ppid = p->real_parent->ti.cpt_pid;
+		} else
+			real_ppid = 0;
+
 		e.pid		= p->ti.cpt_pid;
-		e.ppid		= p->ti.cpt_ppid;
+		e.ppid		= real_ppid;
 		e.pgid		= p->ti.cpt_pgrp;
 		e.sid		= p->ti.cpt_session;
 		e.n_threads	= p->nr_threads;
@@ -700,14 +740,14 @@ static void show_process_tree()
 	pr_debug("Built process tree\n");
 	pr_debug("------------------------------\n");
 	for_each_process(p) {
-		pr_debug("\tpid %6d ppid %6d tgid %6d\n",
+		pr_debug("\tpid %6d ppid %6d rppid %6d tgid %6d\n",
 			 p->ti.cpt_pid, p->ti.cpt_ppid,
-			 p->ti.cpt_tgid);
+			 p->ti.cpt_rppid, p->ti.cpt_tgid);
 		t = p;
 		while_each_thread(p, t) {
-			pr_debug("\t\tpid %6d ppid %6d tgid %6d\n",
+			pr_debug("\t\tpid %6d ppid %6d rppid %6d tgid %6d\n",
 				 t->ti.cpt_pid, t->ti.cpt_ppid,
-				 t->ti.cpt_tgid);
+				 p->ti.cpt_rppid, t->ti.cpt_tgid);
 		}
 	}
 	pr_debug("------------------------------\n");
