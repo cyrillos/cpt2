@@ -17,8 +17,120 @@
 #include "protobuf/sa.pb-c.h"
 #include "protobuf/siginfo.pb-c.h"
 
+static siginfo_t encode_siginfo(struct cpt_siginfo_image *si)
+{
+	siginfo_t d = (siginfo_t)d;
+
+	d.si_signo	= si->cpt_signo;
+	d.si_errno	= si->cpt_errno;
+	d.si_code	= si->cpt_code;
+
+	switch (si->cpt_code & __SI_MASK) {
+	case __SI_POLL:
+		d.si_band	= si->cpt_pid;
+		d.si_fd		= si->cpt_uid;
+		break;
+	case __SI_FAULT:
+		d.si_addr	= (void *)si->cpt_sigval;
+
+/*
+ * Seems the kernel defines __ARCH_SI_TRAPNO for a few
+ * archs but not for x86, thus leave this ifdef as is.
+ */
+#ifdef __ARCH_SI_TRAPNO
+		d.si_trapno	= si->cpt_pid;
+#endif
+		break;
+	case __SI_CHLD:
+		d.si_pid	= si->cpt_pid;
+		d.si_uid	= si->cpt_uid;
+		d.si_status	= si->cpt_sigval;
+		d.si_stime	= si->cpt_stime;
+		d.si_utime	= si->cpt_utime;
+		break;
+	case __SI_KILL:
+	case __SI_RT:
+	case __SI_MESGQ:
+	default:
+		d.si_pid	= si->cpt_pid;
+		d.si_uid	= si->cpt_uid;
+		d.si_ptr	= (void *)si->cpt_sigval;
+		break;
+	}
+
+	return d;
+}
+
+static int write_sigqueue(context_t *ctx, struct task_struct *t,
+			  int fd, off_t start, char *queue)
+{
+	SiginfoEntry sie = SIGINFO_ENTRY__INIT;
+	int ret = 0;
+
+	while (start) {
+		union {
+			struct cpt_object_hdr		h;
+			struct cpt_siginfo_image	si;
+		} u;
+
+		siginfo_t s;
+
+		ret = read_obj_hdr(ctx->fd, &u.h, start);
+		if (ret) {
+			pr_err("Can't read %s sigqueue header at @%li\n",
+			       queue, (long)start);
+			goto err;
+		}
+
+		/* End reached */
+		if (u.h.cpt_object != CPT_OBJ_SIGINFO ||
+		    u.h.cpt_content != CPT_CONTENT_VOID)
+			break;
+
+		ret = read_obj_cont(ctx->fd, &u.si);
+		if (ret) {
+			pr_err("Can't read %s sigqueue object at @%li\n",
+			       queue, (long)start);
+			goto err;
+		}
+
+		s = encode_siginfo(&u.si);
+		sie.siginfo.len = sizeof(s);
+		sie.siginfo.data = (void *)&s;
+
+		ret = pb_write_one(fd, &sie, PB_SIGINFO);
+		if (ret)
+			goto err;
+
+		start += u.h.cpt_next;
+	}
+
+err:
+	return ret;
+}
+
 int write_signal_queues(context_t *ctx, struct task_struct *t)
 {
+	int fd = -1, ret;
+
+	fd = open_image(ctx, CR_FD_PSIGNAL, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	ret = write_sigqueue(ctx, t, fd, t->aux_pos.off_sig_share_pending, "shared");
+	close(fd);
+	if (ret)
+		return -1;
+
+	fd = open_image(ctx, CR_FD_SIGNAL, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	ret = write_sigqueue(ctx, t, fd, t->aux_pos.off_sig_priv_pending, "private");
+	close(fd);
+	if (ret)
+		return -1;
+
 	return 0;
 }
 
