@@ -858,7 +858,7 @@ static int read_vmas(context_t *ctx, struct mm_struct *mm,
 		vma->status = 0;
 		vma->file = NULL;
 
-		if (read_obj_cpt_cont(ctx->fd, &vma->vmai))
+		if (read_obj_cont(ctx->fd, &vma->vmai))
 			goto out;
 
 		memcpy(&vma->vmai, &h, sizeof(h));

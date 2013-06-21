@@ -877,21 +877,21 @@ static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 
 			switch (sprig->u.hdr.cpt_object) {
 			case CPT_OBJ_TIMERFD:
-				if (read_obj_cpt_cont(ctx->fd, &sprig->u.tfi)) {
+				if (read_obj_cont(ctx->fd, &sprig->u.tfi)) {
 					obj_free_to(sprig);
 					pr_err("Failed to read timerfd\n");
 					goto err;
 				}
 				break;
 			case CPT_OBJ_EVENTFD:
-				if (read_obj_cpt_cont(ctx->fd, &sprig->u.efi)) {
+				if (read_obj_cont(ctx->fd, &sprig->u.efi)) {
 					obj_free_to(sprig);
 					pr_err("Failed to read eventfd\n");
 					goto err;
 				}
 				break;
 			case CPT_OBJ_FLOCK:
-				if (read_obj_cpt_cont(ctx->fd, &sprig->u.fli)) {
+				if (read_obj_cont(ctx->fd, &sprig->u.fli)) {
 					obj_free_to(sprig);
 					pr_err("Failed to read flock\n");
 					goto err;

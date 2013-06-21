@@ -75,20 +75,6 @@ extern int read_obj(int fd, int objtype, void *p, size_t size, off_t pos);
 	__ret;								\
 })
 
-#define read_obj_cpt_cont(fd, p)					\
-({									\
-	u64 __size = sizeof(*(p)) - sizeof(struct cpt_object_hdr);	\
-	void *__p = (void *)(p) + sizeof(struct cpt_object_hdr);	\
-	int __ret = -1;							\
-									\
-	if (read_data(fd, __p, __size, false) == 0)			\
-		__ret = 0;						\
-	else								\
-		pr_err("Can't read object payload\n");			\
-									\
-	__ret;								\
-})
-
 /*
  * General object helpers
  */
