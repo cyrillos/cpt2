@@ -113,7 +113,7 @@ int write_signal_private_queue(context_t *ctx, struct task_struct *t)
 {
 	int fd = -1, ret;
 
-	fd = open_image(ctx, CR_FD_SIGNAL, O_DUMP, t->ti.cpt_pid);
+	fd = open_image(ctx, CR_FD_PSIGNAL, O_DUMP, t->ti.cpt_pid);
 	if (fd < 0)
 		return -1;
 
@@ -129,7 +129,7 @@ int write_signal_queues(context_t *ctx, struct task_struct *t)
 {
 	int fd = -1, ret;
 
-	fd = open_image(ctx, CR_FD_PSIGNAL, O_DUMP, t->ti.cpt_pid);
+	fd = open_image(ctx, CR_FD_SIGNAL, O_DUMP, t->ti.cpt_pid);
 	if (fd < 0)
 		return -1;
 
@@ -138,7 +138,7 @@ int write_signal_queues(context_t *ctx, struct task_struct *t)
 	if (ret)
 		return -1;
 
-	fd = open_image(ctx, CR_FD_SIGNAL, O_DUMP, t->ti.cpt_pid);
+	fd = open_image(ctx, CR_FD_PSIGNAL, O_DUMP, t->ti.cpt_pid);
 	if (fd < 0)
 		return -1;
 
