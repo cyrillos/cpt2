@@ -138,16 +138,7 @@ int write_signal_queues(context_t *ctx, struct task_struct *t)
 	if (ret)
 		return -1;
 
-	fd = open_image(ctx, CR_FD_PSIGNAL, O_DUMP, t->ti.cpt_pid);
-	if (fd < 0)
-		return -1;
-
-	ret = write_sigqueue(ctx, t, fd, t->aux_pos.off_sig_priv_pending, "private");
-	close(fd);
-	if (ret)
-		return -1;
-
-	return 0;
+	return write_signal_private_queue(ctx, t);
 }
 
 int write_sighandlers(context_t *ctx, struct task_struct *t)
