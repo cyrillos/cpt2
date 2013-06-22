@@ -33,5 +33,6 @@ extern void free_sighandlers(context_t *ctx);
 extern int read_sighand(context_t *ctx);
 extern int write_sighandlers(context_t *ctx, struct task_struct *t);
 extern int write_signal_queues(context_t *ctx, struct task_struct *t);
+extern int write_signal_private_queue(context_t *ctx, struct task_struct *t);
 
 #endif /* __CPT2_SIG_H__ */

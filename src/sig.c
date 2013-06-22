@@ -109,6 +109,22 @@ err:
 	return ret;
 }
 
+int write_signal_private_queue(context_t *ctx, struct task_struct *t)
+{
+	int fd = -1, ret;
+
+	fd = open_image(ctx, CR_FD_SIGNAL, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	ret = write_sigqueue(ctx, t, fd, t->aux_pos.off_sig_priv_pending, "private");
+	close(fd);
+	if (ret)
+		return -1;
+
+	return 0;
+}
+
 int write_signal_queues(context_t *ctx, struct task_struct *t)
 {
 	int fd = -1, ret;

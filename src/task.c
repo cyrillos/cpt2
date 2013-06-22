@@ -519,6 +519,9 @@ static int __write_thread_images(context_t *ctx, struct task_struct *t)
 		return -1;
 	}
 
+	if (write_signal_private_queue(ctx, t))
+		return -1;
+
 	return 0;
 }
 
