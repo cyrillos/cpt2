@@ -172,7 +172,7 @@ int write_sighandlers(context_t *ctx, struct task_struct *t)
 		e.sigaction	= s->sig[i].cpt_handler;
 		e.restorer	= s->sig[i].cpt_restorer;
 		e.flags		= s->sig[i].cpt_flags;
-		e.mask		= s->sig[i].cpt_flags;
+		e.mask		= s->sig[i].cpt_mask;
 
 		if (pb_write_one(fd, &e, PB_SIGACT) < 0)
 			goto err;
