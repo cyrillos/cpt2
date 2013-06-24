@@ -162,12 +162,17 @@ int write_sighandlers(context_t *ctx, struct task_struct *t)
 	for (i = 0; i < ARRAY_SIZE(s->sig); i++) {
 		sa_entry__init(&e);
 
-		if (s->sig[i].cpt_handler || s->sig[i].cpt_restorer) {
-			e.sigaction	= s->sig[i].cpt_handler;
-			e.restorer	= s->sig[i].cpt_restorer;
-			e.flags		= s->sig[i].cpt_flags;
-			e.mask		= s->sig[i].cpt_flags;
-		}
+		/*
+		 * These are always ignored from userspace.
+		 */
+		if (s->sig[i].cpt_signo == SIGKILL ||
+		    s->sig[i].cpt_signo == SIGSTOP)
+			continue;
+
+		e.sigaction	= s->sig[i].cpt_handler;
+		e.restorer	= s->sig[i].cpt_restorer;
+		e.flags		= s->sig[i].cpt_flags;
+		e.mask		= s->sig[i].cpt_flags;
 
 		if (pb_write_one(fd, &e, PB_SIGACT) < 0)
 			goto err;
@@ -196,14 +201,14 @@ static void show_sighand_cont(context_t *ctx, struct sighand_struct *s)
 		(long)obj_of(s)->o_pos, s->nr_signals);
 
 	for (i = 0; i < ARRAY_SIZE(s->sig); i++) {
-		if (!s->sig[i].cpt_handler && !s->sig[i].cpt_restorer)
-			continue;
-		pr_debug("\t\t%3d: %#-16lx %#-16lx %#-16lx %#-16lx\n",
-			s->sig[i].cpt_signo,
-			(long)s->sig[i].cpt_handler,
-			(long)s->sig[i].cpt_restorer,
-			(long)s->sig[i].cpt_flags,
-			(long)s->sig[i].cpt_mask);
+		if ((void *)s->sig[i].cpt_handler != SIG_DFL || s->sig[i].cpt_flags) {
+			pr_debug("\t\t%3d: %#-16lx %#-16lx %#-16lx %#-16lx\n",
+				 s->sig[i].cpt_signo,
+				 (long)s->sig[i].cpt_handler,
+				 (long)s->sig[i].cpt_restorer,
+				 (long)s->sig[i].cpt_flags,
+				 (long)s->sig[i].cpt_mask);
+		}
 	}
 }
 
@@ -226,10 +231,15 @@ static int read_sighandlers(context_t *ctx, struct sighand_struct *s,
 			goto err;
 		}
 
-		if (s->sig[si.cpt_signo].cpt_handler == 0)
+		/*
+		 * We skip these two, since they are kernel only and
+		 * can't be set from userspace.
+		 */
+		if (si.cpt_signo != SIGSTOP &&
+		    si.cpt_signo != SIGKILL) {
+			s->sig[si.cpt_signo] = si;
 			s->nr_signals++;
-
-		s->sig[si.cpt_signo] = si;
+		}
 
 		start += si.cpt_next;
 	}
