@@ -881,13 +881,14 @@ static void show_task_cont(context_t *ctx, struct task_struct *t)
 
 	pr_debug("\t@%-8li pid %6d tgid %6d ppid %6d rppid %6d pgrp %6d\n"
 		 "\t\tcomm '%s' session %d leader %d 64bit %d\n"
-		 "\t\tmm @%-8ld files @%-8ld fs @%-8ld signal @%-8ld\n"
+		 "\t\tmm @%-8ld files @%-8ld fs @%-8ld signal @%-8ld sighand @%-8ld\n"
 		 "\t\tstate @%-8ld exit_code @%-8ld posix_timers @%-8ld\n"
 		 "\t\t\t%s\n",
 		 (long)obj_of(t)->o_pos, ti->cpt_pid, ti->cpt_tgid, ti->cpt_ppid,
 		 ti->cpt_rppid, ti->cpt_pgrp, ti->cpt_comm, ti->cpt_session,
 		 ti->cpt_leader,ti->cpt_64bit, (long)ti->cpt_mm,
-		 (long)ti->cpt_files, (long)ti->cpt_fs, (long)ti->cpt_signal,
+		 (long)ti->cpt_files, (long)ti->cpt_fs,
+		 (long)ti->cpt_signal, (long)ti->cpt_sighand,
 		 (long)ti->cpt_state, (long)ti->cpt_exit_code,
 		 (long)ti->cpt_posix_timers, get_task_state(t));
 }
