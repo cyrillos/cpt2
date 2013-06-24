@@ -145,7 +145,7 @@ int write_sighandlers(context_t *ctx, struct task_struct *t)
 {
 	struct sighand_struct *s;
 	int ret = -1, fd = -1;
-	unsigned int i;
+	unsigned int sig;
 	SaEntry e;
 
 	s = obj_lookup_to(CPT_OBJ_SIGHAND_STRUCT, t->ti.cpt_sighand);
@@ -159,20 +159,25 @@ int write_sighandlers(context_t *ctx, struct task_struct *t)
 	if (fd < 0)
 		goto err;
 
-	for (i = 0; i < ARRAY_SIZE(s->sig); i++) {
+	/*
+	 * Note the signal numbers coming from the OpenVZ
+	 * image are started by 0 while in CRIU they are
+	 * counted from 1.
+	 */
+
+	for (sig = 0; sig < ARRAY_SIZE(s->sig); sig++) {
 		sa_entry__init(&e);
 
 		/*
 		 * These are always ignored from userspace.
 		 */
-		if (s->sig[i].cpt_signo == SIGKILL ||
-		    s->sig[i].cpt_signo == SIGSTOP)
+		if (sig == (SIGKILL - 1) || sig == (SIGSTOP - 1))
 			continue;
 
-		e.sigaction	= s->sig[i].cpt_handler;
-		e.restorer	= s->sig[i].cpt_restorer;
-		e.flags		= s->sig[i].cpt_flags;
-		e.mask		= s->sig[i].cpt_mask;
+		e.sigaction	= s->sig[sig].cpt_handler;
+		e.restorer	= s->sig[sig].cpt_restorer;
+		e.flags		= s->sig[sig].cpt_flags;
+		e.mask		= s->sig[sig].cpt_mask;
 
 		if (pb_write_one(fd, &e, PB_SIGACT) < 0)
 			goto err;
@@ -201,8 +206,9 @@ static void show_sighand_cont(context_t *ctx, struct sighand_struct *s)
 		(long)obj_of(s)->o_pos, s->nr_signals);
 
 	for (i = 0; i < ARRAY_SIZE(s->sig); i++) {
-		if ((void *)s->sig[i].cpt_handler != SIG_DFL || s->sig[i].cpt_flags) {
-			pr_debug("\t\t%3d: %#-16lx %#-16lx %#-16lx %#-16lx\n",
+		if (s->sig[i].cpt_handler != (u64)SIG_DFL || s->sig[i].cpt_flags) {
+			pr_debug("\t\tkernel nr %3d: handler %#-16lx restorer "
+				 "%#-16lx flags %#-16lx mask %#-16lx\n",
 				 s->sig[i].cpt_signo,
 				 (long)s->sig[i].cpt_handler,
 				 (long)s->sig[i].cpt_restorer,
@@ -225,27 +231,37 @@ static int read_sighandlers(context_t *ctx, struct sighand_struct *s,
 			goto err;
 		}
 
-		if (si.cpt_signo >= SIGMAX) {
+		if (si.cpt_signo > SIGMAX) {
 			pr_err("Unexpected signal number %d at @%li\n",
 			       si.cpt_signo, (long)start);
 			goto err;
 		}
 
-		/*
-		 * We skip these two, since they are kernel only and
-		 * can't be set from userspace.
-		 */
-		if (si.cpt_signo != SIGSTOP &&
-		    si.cpt_signo != SIGKILL) {
-			s->sig[si.cpt_signo] = si;
-			s->nr_signals++;
-		}
+		s->sig[si.cpt_signo] = si;
+		s->nr_signals++;
 
 		start += si.cpt_next;
 	}
 	ret = 0;
 err:
 	return ret;
+}
+
+static void sighand_init(struct sighand_struct *s)
+{
+	BUILD_BUG_ON((void *)SIG_DFL != (void *)NULL);
+
+	/*
+	 * Init to zero means here two things:
+	 *
+	 * - it indeed zero all date thus we don't
+	 *   have any heap trash in
+	 *
+	 * - zero entry means default signal handler,
+	 *   note the handlers in image are optional
+	 */
+	memzero(s->sig, sizeof(s->sig));
+	s->nr_signals = 0;
 }
 
 int read_sighand(context_t *ctx)
@@ -262,24 +278,13 @@ int read_sighand(context_t *ctx)
 		s = obj_alloc_to(struct sighand_struct, si);
 		if (!s)
 			goto err;
+		sighand_init(s);
 
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_SIGHAND_STRUCT, &s->si, start)) {
 			obj_free_to(s);
 			pr_err("Can't read sighand struct at @%li\n", (long)start);
 			goto err;
 		}
-
-		/*
-		 * Init to zero means here two things:
-		 *
-		 * - it indeed zero all date thus we don't
-		 *   have any heap trash in
-		 *
-		 * - zero entry means default signal handler,
-		 *   note the handlers in image are optional
-		 */
-		memzero(s->sig, sizeof(s->sig));
-		s->nr_signals = 0;
 
 		if (s->si.cpt_next > s->si.cpt_hdrlen) {
 			if (read_sighandlers(ctx, s,
