@@ -106,10 +106,13 @@ void free_mm(context_t *ctx)
 
 }
 
-static void show_mmi_cont(context_t *ctx, struct cpt_mm_image *mmi)
+static void show_mmi_cont(context_t *ctx, struct mm_struct *mm)
 {
-	pr_debug("\tstart_code 0x%-16lx end_code  0x%-16lx "
+	struct cpt_mm_image *mmi = &mm->mmi;
+
+	pr_debug("\t@%-8li start_code 0x%-16lx end_code  0x%-16lx "
 		 "start_data 0x%-16lx  end_data 0x%-16lx mm_flags 0x%-16lx\n",
+		 (long)obj_of(mm)->o_pos,
 		 (long)mmi->cpt_start_code, (long)mmi->cpt_end_code,
 		 (long)mmi->cpt_start_data, (long)mmi->cpt_end_data,
 		 (long)mmi->cpt_mm_flags);
@@ -919,7 +922,7 @@ int read_mm(context_t *ctx)
 		}
 
 		obj_push_hash_to(mm, CPT_OBJ_MM, start);
-		show_mmi_cont(ctx, &mm->mmi);
+		show_mmi_cont(ctx, mm);
 
 		if (read_vmas(ctx, mm, start + mm->mmi.cpt_hdrlen, start + mm->mmi.cpt_next))
 			goto out;
