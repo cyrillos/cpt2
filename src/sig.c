@@ -17,48 +17,53 @@
 #include "protobuf/sa.pb-c.h"
 #include "protobuf/siginfo.pb-c.h"
 
-static siginfo_t encode_siginfo(struct cpt_siginfo_image *si)
+static void encode_siginfo(siginfo_t *d, struct cpt_siginfo_image *si)
 {
-	siginfo_t d = (siginfo_t)d;
-
-	d.si_signo	= si->cpt_signo;
-	d.si_errno	= si->cpt_errno;
-	d.si_code	= si->cpt_code;
+	memzero(d, sizeof(*d));
 
 	switch (si->cpt_code & __SI_MASK) {
+	case __SI_TIMER:
+		d->si_timerid	= si->cpt_pid;
+		d->si_overrun	= si->cpt_uid;
+		d->si_ptr	= (void *)(unsigned long)si->cpt_sigval;
+		break;
 	case __SI_POLL:
-		d.si_band	= si->cpt_pid;
-		d.si_fd		= si->cpt_uid;
+		d->si_band	= si->cpt_pid;
+		d->si_fd	= si->cpt_uid;
 		break;
 	case __SI_FAULT:
-		d.si_addr	= (void *)si->cpt_sigval;
-
+		d->si_addr	= (void *)(unsigned long)si->cpt_sigval;
 /*
  * Seems the kernel defines __ARCH_SI_TRAPNO for a few
  * archs but not for x86, thus leave this ifdef as is.
  */
 #ifdef __ARCH_SI_TRAPNO
-		d.si_trapno	= si->cpt_pid;
+		d->si_trapno	= si->cpt_pid;
 #endif
 		break;
 	case __SI_CHLD:
-		d.si_pid	= si->cpt_pid;
-		d.si_uid	= si->cpt_uid;
-		d.si_status	= si->cpt_sigval;
-		d.si_stime	= si->cpt_stime;
-		d.si_utime	= si->cpt_utime;
+		d->si_pid	= si->cpt_pid;
+		d->si_uid	= si->cpt_uid;
+		d->si_status	= si->cpt_sigval;
+		d->si_stime	= si->cpt_stime;
+		d->si_utime	= si->cpt_utime;
 		break;
+	/*
+	 * FIXME __SI_SYS ?
+	 */
 	case __SI_KILL:
 	case __SI_RT:
 	case __SI_MESGQ:
 	default:
-		d.si_pid	= si->cpt_pid;
-		d.si_uid	= si->cpt_uid;
-		d.si_ptr	= (void *)si->cpt_sigval;
+		d->si_pid	= si->cpt_pid;
+		d->si_uid	= si->cpt_uid;
+		d->si_ptr	= (void *)(unsigned long)si->cpt_sigval;
 		break;
 	}
 
-	return d;
+	d->si_signo	= si->cpt_signo;
+	d->si_errno	= si->cpt_errno;
+	d->si_code	= si->cpt_code;
 }
 
 static int write_sigqueue(context_t *ctx, struct task_struct *t,
@@ -94,7 +99,7 @@ static int write_sigqueue(context_t *ctx, struct task_struct *t,
 			goto err;
 		}
 
-		s = encode_siginfo(&u.si);
+		encode_siginfo(&s, &u.si);
 		sie.siginfo.len = sizeof(s);
 		sie.siginfo.data = (void *)&s;
 

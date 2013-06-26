@@ -20,6 +20,7 @@
 #define __SI_CHLD	(4 << 16)
 #define __SI_RT		(5 << 16)
 #define __SI_MESGQ	(6 << 16)
+#define __SI_SYS	(7 << 16)
 #define __SI_CODE(T,N)	((T) | ((N) & 0xffff))
 
 struct sighand_struct {
