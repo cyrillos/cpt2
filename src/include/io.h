@@ -31,6 +31,8 @@ extern int write_data_at(int fd, void *ptr, size_t size, off_t pos);
 #define __write_at(fd, ptr, size, pos)		write_data_at(fd, ptr, size, pos)
 #define __write_ptr_at(fd, ptr, pos)		__write_at(fd, ptr, sizeof(*ptr), pos)
 
+extern bool io_read_only;
+
 static inline int close_safe(int *fd)
 {
 	int ret = 0;

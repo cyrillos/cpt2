@@ -13,6 +13,7 @@
 #include "cpt2.h"
 #include "log.h"
 #include "net.h"
+#include "io.h"
 
 #include "res/vdso-rhel.h"
 
@@ -23,11 +24,12 @@ int main(int argc, char *argv[])
 	unsigned int loglevel = DEFAULT_LOGLEVEL;
 	int opt, idx;
 
-	const char short_opts[] = "f:D:r:v";
+	const char short_opts[] = "f:D:r:vd";
 	static struct option long_opts[] = {
 		{ "dumpfile",		required_argument, 0, 'f' },
 		{ "root",		required_argument, 0, 'r' },
 		{ "images-dir",		required_argument, 0, 'D' },
+		{ "dry-run",		no_argument, 0, 'd' },
 		{ },
 	};
 
@@ -45,6 +47,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			global_opts.root_dirname = optarg;
+			break;
+		case 'd':
+			io_read_only = true;
 			break;
 		case 'v':
 			if (optind < argc) {

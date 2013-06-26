@@ -10,6 +10,8 @@
 #undef LOG_PREFIX
 #define LOG_PREFIX "io: "
 
+bool io_read_only = false;
+
 int splice_data(int from, int to, size_t size)
 {
 	int attempts = 16; /* Default number of buffers in pipe */
