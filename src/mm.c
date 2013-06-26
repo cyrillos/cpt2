@@ -441,6 +441,9 @@ int write_shmem(context_t *ctx)
 	int ret = -1;
 
 	hash_for_each(shmem_hash, bucket, shmem, hash) {
+		struct inode_struct *inode;
+		unsigned long payload;
+
 		PagemapHead h = PAGEMAP_HEAD__INIT;
 
 		pagemap_fd = open_image(ctx, CR_FD_SHMEM_PAGEMAP, O_DUMP, shmem->shmid);
@@ -456,11 +459,34 @@ int write_shmem(context_t *ctx)
 		if (pb_write_one(pagemap_fd, &h, PB_PAGEMAP_HEAD) < 0)
 			goto err;
 
-		if (vma_has_direct_payload(shmem->vma)) {
-			ret = write_vma_pages(ctx, pagemap_fd, page_fd, shmem->vma);
+		/*
+		 * For anonymous shared memory pages are pinned to inode.
+		 */
+		inode = obj_lookup_to(CPT_OBJ_INODE, shmem->vma->file->fi.cpt_inode);
+		if (!inode) {
+			pr_err("No inode @%li for vma @%li\n",
+			       (long)shmem->vma->file->fi.cpt_inode,
+			       obj_pos_of(shmem->vma));
+			goto err;
+		}
+
+		payload  = (unsigned long)inode->ii.cpt_next;
+		payload -= (unsigned long)inode->ii.cpt_hdrlen;
+
+		if (payload) {
+
+			pr_debug("\tAnonymous shared memory block %#lx %#lx @%li\n",
+				 (long)shmem->vma->vmai.cpt_start,
+				 (long)shmem->vma->vmai.cpt_end,
+				 obj_pos_of(shmem->vma));
+
+			ret = write_page_block(ctx, pagemap_fd, page_fd,
+					       (off_t)obj_pos_of(inode) + inode->ii.cpt_hdrlen,
+					       (off_t)obj_pos_of(inode) + inode->ii.cpt_next,
+					       true, 0, 0);
 			if (ret) {
-				pr_err("Can't write pages header at %li\n",
-				       (long)obj_of(shmem->vma)->o_pos);
+				pr_err("Can't write page block of @%li\n",
+				       obj_pos_of(shmem->vma));
 				goto err;
 			}
 		}
