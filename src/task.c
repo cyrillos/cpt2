@@ -940,33 +940,25 @@ static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
 			break;
 		case CPT_OBJ_SIGNAL_STRUCT:
 			t->aux_pos.off_signal = start;
+			if (t->aux_pos.off_signal != t->ti.cpt_signal) {
+				pr_err("Image corruption @%-8li @%-8li\n",
+				       (long)t->aux_pos.off_signal,
+				       (long)t->ti.cpt_signal);
+				return -1;
+			}
+			if (h.cpt_hdrlen < h.cpt_next)
+				t->aux_pos.off_sig_share_pending = start + h.cpt_hdrlen;
 			break;
 		case CPT_OBJ_SIGINFO:
 			/*
 			 * Siginfo reading problem: for some reason the
-			 * kernel doesn't wrap siginfos into CPT_CONTENT_ARRAY,
+			 * kernel doesn't wrap private siginfo into CPT_CONTENT_ARRAY,
 			 * instead it comes as a series of CPT_OBJ_SIGINFO with
 			 * CPT_CONTENT_VOID content, making reading of these
 			 * objects position dependent.
-			 *
-			 * So what we do here is trying to make read procedure
-			 * position context dependent. Usual structure is the
-			 * following
-			 *
-			 *    <CPT_OBJ_SIGINFO ... CPT_OBJ_SIGINFO>
-			 *    [ <CPT_OBJ_SIGNAL_STRUCT>
-			 *      <CPT_OBJ_SIGINFO ...CPT_OBJ_SIGINFO> ]
-			 *
-			 * first set is obligatory and stands for private
-			 * pending signals queue, in turn the second set
-			 * is optional and set for shared pending signals queue.
 			 */
 			if (!t->aux_pos.off_sig_priv_pending)
 				t->aux_pos.off_sig_priv_pending = start;
-			else if (t->aux_pos.off_signal) {
-				if (!t->aux_pos.off_sig_share_pending)
-					t->aux_pos.off_sig_share_pending = start;
-			}
 			break;
 		default:
 			goto unknown_obj;

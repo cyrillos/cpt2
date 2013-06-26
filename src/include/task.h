@@ -38,7 +38,12 @@ struct task_aux_pos {
 	/* CPT_OBJ_SIGINFO/CPT_CONTENT_VOID */
 	off_t			off_sig_priv_pending;
 
-	/* CPT_OBJ_SIGNAL_STRUCT/CPT_CONTENT_ARRAY */
+	/*
+	 * CPT_OBJ_SIGNAL_STRUCT/CPT_CONTENT_ARRAY
+	 * Note it's the same as cpt_task_image::cpt_signal
+	 * and left here simply for completeness of parsing
+	 * routine.
+	 */
 	off_t			off_signal;
 
 	/* CPT_OBJ_SIGINFO/CPT_CONTENT_VOID */
