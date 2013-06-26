@@ -717,7 +717,7 @@ static void show_vma_cont(context_t *ctx, struct vma_struct *vma)
 		 "\t\t\tflags %#8lx pgprot %#16lx pgoff %#10lx\n"
 		 "\t\t\tanonvma %#8x anonvmaid %#8lx\n"
 		 "\t\t\t(%c%c%c) (%c) (%#x -> [%s])\n"
-		 "\t\t\t(%li payload bytes)\n",
+		 "\t\t\t(%li direct payload bytes)\n",
 		 obj_of(vma)->o_pos, (long)vma->vmai.cpt_file,
 		 vma->vmai.cpt_type, (long)vma->vmai.cpt_start,
 		 (long)vma->vmai.cpt_end, (long)vma->vmai.cpt_flags,
