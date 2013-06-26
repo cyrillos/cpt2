@@ -544,9 +544,6 @@ static int write_file_map(context_t *ctx, pid_t pid, struct vma_struct *vma)
 	rfe.fown	= &fown;
 	rfe.name	= vma->file->name;
 
-//	if (strcmp(rfe.name, " (deleted)/dev/zero") == 0)
-//		rfe.name = "/dev/zero";
-
 	if (vmai_is(vma, VM_WRITE) && vma_is(vma, VMA_FILE_SHARED))
 		rfe.flags = O_RDWR;
 	else
