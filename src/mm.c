@@ -35,7 +35,7 @@ static u8 page[PAGE_SIZE];
 static DEFINE_HASHTABLE(shmem_hash, SHMEM_HASH_BITS);
 
 static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
-			    struct vma_struct *vma, bool all,
+			    off_t start, off_t end, bool all,
 			    u64 addr_start, u64 addr_end);
 
 static struct shmem_struct *shmem_lookup(u64 shmid)
@@ -261,8 +261,10 @@ static int write_copy_pages(context_t *ctx, int pagemap_fd, int page_fd,
 		 * We've got VMA the page block belongs to just
 		 * need to read them and write into image.
 		 */
-		if (write_page_block(ctx, pagemap_fd, page_fd, vma, false,
-				     cpb->cpt_start, cpb->cpt_end))
+		if (write_page_block(ctx, pagemap_fd, page_fd,
+				     obj_of(vma)->o_pos + vma->vmai.cpt_hdrlen,
+				     obj_of(vma)->o_pos + vma->vmai.cpt_next,
+				     false, cpb->cpt_start, cpb->cpt_end))
 			goto err;
 		break;
 	}
@@ -273,7 +275,7 @@ err:
 }
 
 static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
-			    struct vma_struct *vma, bool all,
+			    off_t start, off_t end, bool all,
 			    u64 addr_start, u64 addr_end)
 {
 	union {
@@ -283,12 +285,8 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 	} u;
 
 	unsigned long nr_pages, i;
-	off_t start, end;
 	PagemapEntry pe;
 	int ret = -1;
-
-	start	= obj_of(vma)->o_pos + vma->vmai.cpt_hdrlen;
-	end	= obj_of(vma)->o_pos + vma->vmai.cpt_next;
 
 	for (; start < end; start += u.h.cpt_next) {
 		if (read_obj_cpt(ctx->fd, OBJ_ANY, &u.h, start)) {
@@ -429,7 +427,10 @@ static int write_vma_pages(context_t *ctx, int pagemap_fd, int page_fd,
 	if (unlikely(vma_is(vma, VMA_AREA_VDSO)))
 		return write_vdso_pages(ctx, pagemap_fd, page_fd, vma);
 
-	return write_page_block(ctx, pagemap_fd, page_fd, vma, true, 0, 0);
+	return write_page_block(ctx, pagemap_fd, page_fd,
+				obj_of(vma)->o_pos + vma->vmai.cpt_hdrlen,
+				obj_of(vma)->o_pos + vma->vmai.cpt_next,
+				true, 0, 0);
 }
 
 int write_shmem(context_t *ctx)
