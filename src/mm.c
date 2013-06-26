@@ -136,7 +136,7 @@ static bool is_dev_zero(struct file_struct *file)
 		strcmp(file->name, "/dev/zero") == 0);
 }
 
-static bool vma_has_payload(struct vma_struct *vma)
+static bool vma_has_direct_payload(struct vma_struct *vma)
 {
 	return vma->vmai.cpt_hdrlen < vma->vmai.cpt_next;
 }
@@ -455,7 +455,7 @@ int write_shmem(context_t *ctx)
 		if (pb_write_one(pagemap_fd, &h, PB_PAGEMAP_HEAD) < 0)
 			goto err;
 
-		if (vma_has_payload(shmem->vma)) {
+		if (vma_has_direct_payload(shmem->vma)) {
 			ret = write_vma_pages(ctx, pagemap_fd, page_fd, shmem->vma);
 			if (ret) {
 				pr_err("Can't write pages header at %li\n",
@@ -510,7 +510,7 @@ int write_pages(context_t *ctx, pid_t pid, off_t cpt_mm)
 		 * For vDSO we need to provide own content even
 		 * if it's not provided in image.
 		 */
-		if (!vma_has_payload(vma) && !vma_is(vma, VMA_AREA_VDSO))
+		if (!vma_has_direct_payload(vma) && !vma_is(vma, VMA_AREA_VDSO))
 			continue;
 
 		ret = write_vma_pages(ctx, pagemap_fd, page_fd, vma);
