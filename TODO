@@ -13,3 +13,5 @@
 - convert CPT_OBJ_SIGNAL_STRUCT, CPT_OBJ_LASTSIGINFO, CPT_OBJ_SIGALTSTACK, CPT_OBJ_SIGINFO if needed
 - need to check CLONE_ flags used in criu and here, openvz kernel use different
   methods for flags retrieval from the image (see kernel's make_baby() call)
+- anonymous shared mappings do not restore
+- sysv shared memory not either
