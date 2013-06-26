@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	unsigned int loglevel = DEFAULT_LOGLEVEL;
 	int opt, idx;
 
-	const char short_opts[] = "f:D:r:vd";
+	const char short_opts[] = "f:D:r:v:d";
 	static struct option long_opts[] = {
 		{ "dumpfile",		required_argument, 0, 'f' },
 		{ "root",		required_argument, 0, 'r' },
@@ -52,15 +52,9 @@ int main(int argc, char *argv[])
 			io_read_only = true;
 			break;
 		case 'v':
-			if (optind < argc) {
-				char *opt = argv[optind];
-
-				if (isdigit(*opt)) {
-					loglevel = atoi(opt);
-					optind++;
-				} else
-					loglevel++;
-			} else
+			if (optarg)
+				loglevel = atoi(optarg);
+			else
 				loglevel++;
 		default:
 			break;
