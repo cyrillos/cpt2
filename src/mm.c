@@ -851,6 +851,7 @@ static int read_vmas(context_t *ctx, struct mm_struct *mm,
 			mm->auxv_at = start;
 			continue;
 		default:
+			pr_debug("\t\tobject %s skipped\n", obj_name(h.cpt_object));
 			continue;
 		}
 
