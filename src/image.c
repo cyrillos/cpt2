@@ -12,6 +12,7 @@
 #include "compiler.h"
 #include "image.h"
 #include "bug.h"
+#include "io.h"
 
 #include "cr-show.h"
 
@@ -76,6 +77,13 @@ int open_image(context_t *ctx, int type, int flags, ...)
 
 	BUG_ON(type >= CR_FD_MAX);
 	BUG_ON(flags == O_RDONLY);
+
+	/*
+	 * Just return some value which
+	 * is not an error.
+	 */
+	if (io_read_only)
+		return 0;
 
 	va_start(args, flags);
 	vsnprintf(path, PATH_MAX, fdset_template[type].fmt, args);

@@ -18,6 +18,9 @@ int splice_data(int from, int to, size_t size)
 	ssize_t ret_in, ret_out;
 	int p[2];
 
+	if (io_read_only)
+		return 0;
+
 	if (pipe(p)) {
 		pr_perror("Can't create transport for splicing data");
 		return -1;
@@ -90,6 +93,9 @@ int write_data(int fd, void *ptr, size_t size)
 {
 	ssize_t ret;
 
+	if (io_read_only)
+		return 0;
+
 	ret = write(fd, ptr, size);
 	if (ret == size)
 		return 0;
@@ -108,7 +114,12 @@ int write_data(int fd, void *ptr, size_t size)
  */
 int write_data_at(int fd, void *ptr, size_t size, off_t pos)
 {
-	off_t cur = lseek(fd, pos, SEEK_SET);
+	off_t cur;
+
+	if (io_read_only)
+		return 0;
+
+	cur = lseek(fd, pos, SEEK_SET);
 	if (cur < 0) {
 		pr_perror("Can't move file position\n");
 		return -1;

@@ -37,7 +37,8 @@ static inline int close_safe(int *fd)
 {
 	int ret = 0;
 	if (*fd > -1) {
-		ret = close(*fd);
+		if (!io_read_only)
+			ret = close(*fd);
 		if (!ret)
 			*fd = -1;
 		else

@@ -11,6 +11,7 @@
 #include "xmalloc.h"
 #include "types.h"
 #include "log.h"
+#include "io.h"
 
 #include "protobuf.h"
 
@@ -47,18 +48,20 @@ int pb_write_one(int fd, void *obj, int type)
 		goto err;
 	}
 
-	ret = write(fd, &size, sizeof(size));
-	if (ret != sizeof(size)) {
-		ret = -1;
-		pr_perror("Can't write %d bytes", (int)sizeof(size));
-		goto err;
-	}
+	if (!io_read_only) {
+		ret = write(fd, &size, sizeof(size));
+		if (ret != sizeof(size)) {
+			ret = -1;
+			pr_perror("Can't write %d bytes", (int)sizeof(size));
+			goto err;
+		}
 
-	ret = write(fd, buf, size);
-	if (ret != size) {
-		ret = -1;
-		pr_perror("Can't write %d bytes", size);
-		goto err;
+		ret = write(fd, buf, size);
+		if (ret != size) {
+			ret = -1;
+			pr_perror("Can't write %d bytes", size);
+			goto err;
+		}
 	}
 
 	ret = 0;
