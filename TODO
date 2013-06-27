@@ -10,8 +10,14 @@
 - while there is eventqueue in openvz, no such thing in criu, ignoring
 - inodes referred to deleted files may have undelied path dump (see dump_one_inode in openvz source code)
 - also there are following undelied data in inodes: tty ref, regular files content (including shmem,shm)
-- convert CPT_OBJ_SIGNAL_STRUCT, CPT_OBJ_LASTSIGINFO, CPT_OBJ_SIGALTSTACK, CPT_OBJ_SIGINFO if needed
 - need to check CLONE_ flags used in criu and here, openvz kernel use different
   methods for flags retrieval from the image (see kernel's make_baby() call)
 - sysv shared memory is not yet converted
 - criu doesn't use CPT_OBJ_LASTSIGINFO
+- is everything from CPT_OBJ_SIGNAL_STRUCT converted?
+
+- Note about signal queues suspend/resume: in openvz the siginfo::si_signo is
+  not check tested for negative value but copies data member by member skipping
+  those who are not the part of a signal. Instead in mainline kernel (ie in
+  CRIU) si_signo is analyzed and if a negative value met -- the siginfo copied
+  by whole structure size, so we're failing on zdtm's sigpending test
