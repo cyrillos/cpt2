@@ -14,3 +14,4 @@
 - need to check CLONE_ flags used in criu and here, openvz kernel use different
   methods for flags retrieval from the image (see kernel's make_baby() call)
 - sysv shared memory is not yet converted
+- criu doesn't use CPT_OBJ_LASTSIGINFO
