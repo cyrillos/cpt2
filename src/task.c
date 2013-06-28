@@ -321,8 +321,12 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 	tc.blk_sigset			= t->ti.cpt_sigrblocked;
 	tc.comm				= (char *)t->ti.cpt_comm;
 
-	if (is_thread)
+	if (is_thread) {
 		core.tc = NULL;
+
+		thread_core.has_blk_sigset = true;
+		thread_core.blk_sigset = t->ti.cpt_sigrblocked;
+	}
 
 #define MAX_USER_RT_PRIO	100
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
