@@ -324,10 +324,6 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 	if (is_thread)
 		core.tc = NULL;
 
-	/*
-	 * FIXME Revisit sched entries.
-	 */
-
 #define MAX_USER_RT_PRIO	100
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
 #define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
