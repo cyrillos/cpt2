@@ -324,8 +324,6 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 	if (is_thread)
 		core.tc = NULL;
 
-	ret = pb_write_one(core_fd, &core, PB_CORE);
-
 	/*
 	 * FIXME Revisit sched entries.
 	 */
@@ -335,13 +333,18 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 #define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
 
 	thread_core.has_sched_nice	= true;
-	thread_core.sched_nice		= 20 - PRIO_TO_NICE(t->ti.cpt_static_prio);
+	thread_core.sched_nice		= PRIO_TO_NICE(t->ti.cpt_static_prio);
 
 	thread_core.has_sched_policy	= true;
 	thread_core.sched_policy	= t->ti.cpt_policy;
 
-	thread_core.has_sched_prio	= true;
-	thread_core.sched_prio		= t->ti.cpt_rt_priority;
+	if (t->ti.cpt_policy == SCHED_RR || t->ti.cpt_policy == SCHED_FIFO) {
+		thread_core.has_sched_prio	= true;
+		thread_core.sched_prio		= t->ti.cpt_rt_priority;
+	}
+
+	ret = pb_write_one(core_fd, &core, PB_CORE);
+
 out:
 	close_safe(&core_fd);
 	return ret;
