@@ -15,6 +15,7 @@
 - sysv shared memory is not yet converted
 - criu doesn't use CPT_OBJ_LASTSIGINFO
 - is everything from CPT_OBJ_SIGNAL_STRUCT converted?
+- sas stack is not yet converted (wait until criu support it)
 
 - Note about signal queues suspend/resume: in openvz the siginfo::si_signo is
   not check tested for negative value but copies data member by member skipping
