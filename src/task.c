@@ -343,6 +343,8 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 		thread_core.sched_prio		= t->ti.cpt_rt_priority;
 	}
 
+	thread_info.clear_tid_addr = t->ti.cpt_clear_tid;
+
 	ret = pb_write_one(core_fd, &core, PB_CORE);
 
 out:
