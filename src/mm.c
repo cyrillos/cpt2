@@ -660,15 +660,6 @@ err:
 
 int write_mm(context_t *ctx, pid_t pid, off_t cpt_mm)
 {
-	struct {
-		u64	cpt_next;
-		u32	cpt_object;
-		u16	cpt_hdrlen;
-		u16	cpt_content;
-
-		u64	vector[AT_VECTOR_SIZE];
-	} auxv;
-
 	MmEntry e = MM_ENTRY__INIT;
 	struct mm_struct *mm;
 	int fd, ret = -1;
@@ -693,13 +684,9 @@ int write_mm(context_t *ctx, pid_t pid, off_t cpt_mm)
 	e.mm_env_start		= mm->mmi.cpt_start_env;
 	e.mm_env_end		= mm->mmi.cpt_end_env;
 
-	memzero(&auxv, sizeof(auxv));
-	if (read_obj_cpt(ctx->fd, CPT_OBJ_MM_AUXV, &auxv, mm->auxv_at))
-		goto out;
-
 	e.exe_file_id		= obj_id_of(mm->exec_vma->file);
-	e.n_mm_saved_auxv	= AT_VECTOR_SIZE;
-	e.mm_saved_auxv		= (void *)auxv.vector;
+	e.n_mm_saved_auxv	= mm->auxv.nwords;
+	e.mm_saved_auxv		= (void *)mm->auxv.vector;
 
 	if (write_reg_file_entry(ctx, mm->exec_vma->file)) {
 		pr_err("Can't add exe_file_id link\n");
@@ -710,6 +697,51 @@ int write_mm(context_t *ctx, pid_t pid, off_t cpt_mm)
 out:
 	close(fd);
 	return ret;
+}
+
+static void show_auxv_cont(context_t *ctx, struct mm_struct *mm)
+{
+	unsigned int i;
+
+	pr_debug("\t\tauxv @%-8li\n", (long)mm->auxv.start);
+
+	pr_debug("\t\t\t");
+	for (i = 0; i < mm->auxv.nwords; i++) {
+		pr_debug("%#016lx ", mm->auxv.vector[i]);
+		if (i && (i % 4) == 0)
+			pr_debug("\n\t\t\t");
+	}
+	pr_debug("\n");
+}
+
+static int read_mm_auxv(context_t *ctx, struct mm_struct *mm, off_t start, off_t end)
+{
+	if (read_obj_hdr(ctx->fd, &mm->auxv.hdr, start)) {
+		pr_err("Can't read AUXV header at %li\n", (long)start);
+		return -1;
+	}
+
+	mm->auxv.nwords  = (mm->auxv.hdr.cpt_next - mm->auxv.hdr.cpt_hdrlen);
+	mm->auxv.nwords /= sizeof(mm->auxv.vector[0]);
+
+	if (mm->auxv.nwords > AT_VECTOR_SIZE - 2) {
+		pr_err("Too many words in AUXV %d\n", mm->auxv.nwords);
+		return -1;
+	}
+
+	if (__read(ctx->fd, mm->auxv.vector,
+		   (mm->auxv.hdr.cpt_next - mm->auxv.hdr.cpt_hdrlen))) {
+		pr_err("Failed reading AUXV at %li\n", (long)start);
+		return -1;
+	}
+
+	mm->auxv.vector[mm->auxv.nwords + 0] = 0;
+	mm->auxv.vector[mm->auxv.nwords + 1] = 0;
+
+	mm->auxv.start = start;
+	show_auxv_cont(ctx, mm);
+
+	return 0;
 }
 
 static char *vma_name(struct vma_struct *vma)
@@ -853,74 +885,66 @@ err:
 	return -1;
 }
 
-static int read_vmas(context_t *ctx, struct mm_struct *mm,
-		     off_t start, off_t end)
+static int read_mm_vma(context_t *ctx, struct mm_struct *mm, off_t start, off_t end)
+{
+	struct vma_struct *vma;
+
+	vma = obj_alloc_to(struct vma_struct, vmai);
+	if (!vma)
+		return -1;
+
+	INIT_LIST_HEAD(&vma->list);
+	vma->status = 0;
+	vma->file = NULL;
+
+	if (read_obj_cpt(ctx->fd, CPT_OBJ_VMA, &vma->vmai, start)) {
+		pr_err("Can't read VMA at @%li\n", (long)start);
+		obj_free_to(vma);
+		return -1;
+	}
+
+	list_add_tail(&vma->list, &mm->vma_list);
+	obj_hash_typed_to(vma, CPT_OBJ_VMA, start);
+
+	if (vma->vmai.cpt_file != -1 && (vma->vmai.cpt_flags & VM_EXECUTABLE))
+		mm->exec_vma = vma;
+
+	if (vma_parse(ctx, mm, vma)) {
+		pr_err("Can't parse VMA at @%li\n", (long)start);
+		return -1;
+	}
+
+	show_vma_cont(ctx, vma);
+	return 0;
+}
+
+static int read_mm_payload(context_t *ctx, struct mm_struct *mm,
+			   off_t start, off_t end)
 {
 	struct cpt_object_hdr h;
-	int ret = -1;
 
 	for (; start < end; start += h.cpt_next) {
-		struct vma_struct *vma;
-
 		if (read_obj_hdr(ctx->fd, &h, start)) {
-			pr_err("Can't read VMA header at %li\n", (long)start);
+			pr_err("Can't read MM payload header at @%li\n", (long)start);
 			return -1;
 		}
 
 		switch (h.cpt_object) {
 		case CPT_OBJ_VMA:
+			if (read_mm_vma(ctx, mm, start, end))
+				return -1;
 			break;
 		case CPT_OBJ_MM_AUXV:
-			mm->has_auxv = true;
-			mm->auxv_at = start;
-			continue;
+			if (read_mm_auxv(ctx, mm, start, end))
+				return -1;
+			break;
 		default:
 			pr_debug("\t\tobject %s skipped\n", obj_name(h.cpt_object));
-			continue;
+			break;
 		}
-
-		vma = obj_alloc_to(struct vma_struct, vmai);
-		if (!vma)
-			goto out;
-		INIT_LIST_HEAD(&vma->list);
-		vma->status = 0;
-		vma->file = NULL;
-
-		if (read_obj_cont(ctx->fd, &vma->vmai))
-			goto out;
-
-		memcpy(&vma->vmai, &h, sizeof(h));
-		list_add_tail(&vma->list, &mm->vma_list);
-
-		if (vma->vmai.cpt_file != -1 &&
-		    (vma->vmai.cpt_flags & VM_EXECUTABLE)) {
-			mm->exec_vma = vma;
-		}
-
-		obj_hash_typed_to(vma, CPT_OBJ_VMA, start);
-
-		if (vma_parse(ctx, mm, vma)) {
-			pr_err("Can't parse VMA at @%li\n",
-			       start);
-			goto out;
-		}
-
-		show_vma_cont(ctx, vma);
 	}
 
-	if (!mm->exec_vma) {
-		pr_err("No self-exe vma found for MM at @%li\n",
-		       (long)obj_of(mm)->o_pos);
-		goto out;
-	} else if (!mm->has_auxv) {
-		pr_err("No auxv found for MM at @%li\n",
-		       (long)obj_of(mm)->o_pos);
-		goto out;
-	}
-
-	ret = 0;
-out:
-	return ret;
+	return 0;
 }
 
 int read_mm(context_t *ctx)
@@ -936,9 +960,8 @@ int read_mm(context_t *ctx)
 		if (!mm)
 			return -1;
 		INIT_LIST_HEAD(&mm->vma_list);
-		mm->has_auxv = false;
-		mm->auxv_at = 0;
 		mm->exec_vma = NULL;
+		memzero(&mm->auxv, sizeof(mm->auxv));
 
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_MM, &mm->mmi, start)) {
 			obj_free_to(mm);
@@ -949,11 +972,22 @@ int read_mm(context_t *ctx)
 		obj_push_hash_to(mm, CPT_OBJ_MM, start);
 		show_mmi_cont(ctx, mm);
 
-		if (read_vmas(ctx, mm, start + mm->mmi.cpt_hdrlen, start + mm->mmi.cpt_next))
+		if (read_mm_payload(ctx, mm, start + mm->mmi.cpt_hdrlen, start + mm->mmi.cpt_next))
 			goto out;
+
+		if (!mm->exec_vma) {
+			pr_err("No self-exe vma found for MM at @%li\n",
+			       (long)obj_of(mm)->o_pos);
+			goto out;
+		} else if (!mm->auxv.nwords) {
+			pr_err("No auxv found for MM at @%li\n",
+			       (long)obj_of(mm)->o_pos);
+			goto out;
+		}
 
 		start += mm->mmi.cpt_next;
 	}
+
 	pr_read_end();
 	ret = 0;
 out:

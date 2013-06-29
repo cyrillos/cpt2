@@ -10,12 +10,17 @@
 
 struct file_struct;
 
+struct mm_auxv_struct {
+	struct cpt_object_hdr	hdr;
+	off_t			start;
+	u64			vector[AT_VECTOR_SIZE];
+	unsigned int		nwords;
+};
+
 struct mm_struct {
 	struct list_head	vma_list;
 
-	bool			has_auxv;
-	off_t			auxv_at;
-
+	struct mm_auxv_struct	auxv;
 	struct vma_struct	*exec_vma;
 
 	struct cpt_mm_image	mmi;
