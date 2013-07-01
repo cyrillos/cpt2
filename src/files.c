@@ -217,12 +217,6 @@ static int dump_ghost_file(context_t *ctx, struct file_struct *file,
 	int ghost_fd = -1;
 	int ret = -1;
 
-	if (inode->ii.cpt_nlink != 0) {
-		pr_err("Found %d links on deleted file inode at @%li\n",
-		       inode->ii.cpt_nlink, (long)obj_of(inode)->o_pos);
-		return -1;
-	}
-
 	BUG_ON(obj_id_of(inode) & REMAP_GHOST);
 
 	if (!inode->u.dumped_ghost) {
@@ -280,6 +274,18 @@ err:
 	return ret;
 }
 
+static int dump_deleted_file(context_t *ctx, struct file_struct *file,
+			     struct inode_struct *inode)
+{
+	if (inode->ii.cpt_nlink) {
+		pr_err("Found %d links on deleted file inode at @%li\n",
+		       inode->ii.cpt_nlink, (long)obj_of(inode)->o_pos);
+		return -1;
+	}
+
+	return dump_ghost_file(ctx, file, inode);
+}
+
 static int check_path_remap(context_t *ctx, struct file_struct *file)
 {
 	struct inode_struct *inode;
@@ -295,7 +301,7 @@ static int check_path_remap(context_t *ctx, struct file_struct *file)
 	}
 
 	if (file->fi.cpt_lflags & CPT_DENTRY_DELETED)
-		return dump_ghost_file(ctx, file, inode);
+		return dump_deleted_file(ctx, file, inode);
 
 	/*
 	 * FIXME Deleted but linked path.
