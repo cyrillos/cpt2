@@ -318,14 +318,14 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 	tc.exit_code			= t->ti.cpt_exit_code;
 	tc.personality			= t->ti.cpt_personality;
 	tc.flags			= t->ti.cpt_flags;
-	tc.blk_sigset			= t->ti.cpt_sigrblocked;
+	tc.blk_sigset			= t->ti.cpt_sigblocked;
 	tc.comm				= (char *)t->ti.cpt_comm;
 
 	if (is_thread) {
 		core.tc = NULL;
 
 		thread_core.has_blk_sigset = true;
-		thread_core.blk_sigset = t->ti.cpt_sigrblocked;
+		thread_core.blk_sigset = t->ti.cpt_sigblocked;
 	}
 
 #define MAX_USER_RT_PRIO	100
