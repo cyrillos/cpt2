@@ -78,7 +78,7 @@ static const char *section_name(int type)
 	return (type < ARRAY_SIZE(n)) ? n[type] : "Unknown";
 };
 
-char *read_name(int fd, off_t pos, off_t *next)
+char *read_name(int fd, off_t pos, size_t *read_bytes, off_t *next)
 {
 	struct cpt_object_hdr h;
 
@@ -99,6 +99,12 @@ char *read_name(int fd, off_t pos, off_t *next)
 		}
 
 		name[len] = '\0';
+
+		/*
+		 * Note ending \0 is not counted here.
+		 */
+		if (read_bytes)
+			*read_bytes = len;
 
 		if (next)
 			*next = h.cpt_next;

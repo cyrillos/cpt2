@@ -235,6 +235,7 @@ static int read_inotify_watch(context_t *ctx, off_t start, off_t end, struct ino
 		if (!file)
 			return -1;
 		file->name = NULL;
+		file->namelen = 0;
 
 		at = obj_of(wd)->o_pos + wd->wdi.cpt_hdrlen;
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_FILE, &file->fi, at)) {
@@ -255,7 +256,7 @@ static int read_inotify_watch(context_t *ctx, off_t start, off_t end, struct ino
 		list_add_tail(&wd->list, &inotify->wd_list);
 
 		at = obj_of(file)->o_pos + file->fi.cpt_hdrlen;
-		file->name = read_name(ctx->fd, at, NULL);
+		file->name = read_name(ctx->fd, at, &file->namelen, NULL);
 		if (IS_ERR(file->name)) {
 			file->name = NULL;
 			return -1;

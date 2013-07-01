@@ -6,7 +6,7 @@
 #include "context.h"
 
 extern void get_section_bounds(context_t *ctx, int type, off_t *start, off_t *end);
-extern char *read_name(int fd, off_t pos, off_t *next);
+extern char *read_name(int fd, off_t pos, size_t *read_bytes, off_t *next);
 extern int read_dumpfile(context_t *ctx);
 extern void read_fini(context_t *ctx);
 

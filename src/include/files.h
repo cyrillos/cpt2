@@ -26,6 +26,7 @@ struct file_sprig_struct {
 struct file_struct {
 	bool				dumped;
 	char				*name;
+	size_t				namelen;
 
 	struct cpt_file_image		fi;
 	struct file_sprig_struct	*sprig;
@@ -54,6 +55,7 @@ struct inode_struct {
 	union {
 		bool			dumped_pipe;
 		bool			dumped_ghost;
+		bool			dumped_remap;
 	} u;
 
 	struct cpt_inode_image		ii;

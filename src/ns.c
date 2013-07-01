@@ -189,17 +189,17 @@ int read_ns(context_t *ctx)
 		}
 
 		pos = start + h.cpt_hdrlen;
-		v->mnt_dev = read_name(ctx->fd, pos, &next);
+		v->mnt_dev = read_name(ctx->fd, pos, NULL, &next);
 		if (IS_ERR(v->mnt_dev))
 			goto free;
 
 		pos += next;
-		v->mnt_point = read_name(ctx->fd, pos, &next);
+		v->mnt_point = read_name(ctx->fd, pos, NULL, &next);
 		if (IS_ERR(v->mnt_point))
 			goto free;
 
 		pos += next;
-		v->mnt_type = read_name(ctx->fd, pos, &next);
+		v->mnt_type = read_name(ctx->fd, pos, NULL, &next);
 		if (IS_ERR(v->mnt_type))
 			goto free;
 
