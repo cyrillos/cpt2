@@ -22,3 +22,5 @@
   those who are not the part of a signal. Instead in mainline kernel (ie in
   CRIU) si_signo is analyzed and if a negative value met -- the siginfo copied
   by whole structure size, so we're failing on zdtm's sigpending test
+
+- Restart blocks (see refs to restart_block) what to do in criu area?

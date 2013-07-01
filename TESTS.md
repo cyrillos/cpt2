@@ -28,8 +28,59 @@ ZDTM statistics
 + static/pthread01
 + static/umask00
 + static/cmdlinenv00
++ static/pid00
++ static/pstree
+- static/caps00
+	[root@ovz criu]# sh test/zdtm-cpt2.sh stop static/caps00
+	13:53:53.457:   730: /proc/sys/kernel/cap_last_cap is not available
+	13:58:23.005:   730: FAIL: caps00.c:151: Fail: 5 (errno = 11 (Resource temporarily unavailable))
++ static/selfexe00
++ static/eventfs00
+- static/signalfd00
+	[root@ovz criu]# sh test/zdtm-cpt2.sh stop static/signalfd00
+	13:59:21.146:   836: FAIL: signalfd00.c:53: ghost signal (errno = 11 (Resource temporarily unavailable))
++ static/inotify00
+- static/fanotify00
+	- can not start it on openvz kernel
++ static/fifo-rowo-pair
+- static/fifo-ghost
+	- need to implement
++ static/fifo
++ static/fifo_wronly
++ static/zombie00
++ static/rlimits00
++ static/cow01
++ static/fpu00
++ static/fpu01
++ static/mmx00
++ static/sse00
++ static/sse20
++ static/fdt_shared
+- static/sigpending
+	- fails because openvz kernel does not check for si_code < 0 on
+	  checkpoint, but copies data field by field. Instead in vanilla
+	  kernel if si_code < 0 then the pending signal structure is copied
+	  as a whole by once preserving all data (even that which is in padding)
++ static/unlink_fstat00
++ static/unlink_fstat02
+- static/unlink_fstat03
+	- fails because test migrates from simfs to bind mounting, otherwise
+	  works as expected
 
-sh test/zdtm-cpt2.sh start static/pipe00 static/pipe01 static/cwd00 static/env00  static/maps00 static/mprotect00 static/mtime_mmap static/sleeping00 static/write_read00 static/write_read01 static/write_read02 static/write_read10 static/wait00 static/vdso00 static/file_shared static/sched_prio00 static/timers static/xids00 static/groups static/umask00 static/cmdlinenv00 static/futex static/futex-rl static/pthread00 static/pthread01
+static/file_locks00
+static/file_locks01
+
+static/child_opened_proc
+
+-- static/proc-self
+static/file_fown
+
+-- static/mountpoints
+
+sh test/zdtm-cpt2.sh start static/signalfd00 static/fifo-ghost static/file_locks00 static/file_locks01 static/unlink_fstat00 static/unlink_fstat02 static/unlink_fstat03 static/child_opened_proc static/file_fown
+
+
+sh test/zdtm-cpt2.sh start static/pipe00 static/pipe01 static/cwd00 static/env00  static/maps00 static/mprotect00 static/mtime_mmap static/sleeping00 static/write_read00 static/write_read01 static/write_read02 static/write_read10 static/wait00 static/vdso00 static/file_shared static/sched_prio00 static/timers static/xids00 static/groups static/umask00 static/cmdlinenv00 static/futex static/futex-rl static/pthread00 static/pthread01 static/pid00 static/pstree static/selfexe00 static/eventfs00 static/inotify00 static/fifo-rowo-pair static/fifo static/fifo_wronly static/zombie00 static/rlimits00 static/cow01 static/fpu00 static/fpu01 static/mmx00 static/sse00 static/sse20 static/fdt_shared static/unlink_fstat00 static/unlink_fstat02
 
 Not yet run
 -----------
@@ -45,10 +96,6 @@ static/sockets_spair
 static/sockets_dgram
 static/socket_queues
 static/sk-unix-unconn
-static/pid00
-static/pstree
-static/caps00
-static/cmdlinenv00
 static/socket_listen
 static/socket_listen6
 static/packet_sock
@@ -56,42 +103,15 @@ static/socket_udp
 static/sock_filter
 static/socket6_udp
 static/socket_udplite
-static/selfexe00
-static/unlink_fstat00
-static/unlink_fstat02
-static/unlink_fstat03
-static/eventfs00
-static/signalfd00
-static/inotify00
-static/fanotify00
 static/unbound_sock
-static/fifo-rowo-pair
-static/fifo-ghost
-static/fifo
-static/fifo_wronly
-static/zombie00
-static/rlimits00
 transition/fork
 static/pty00
 static/pty01
 static/pty04
 static/tty02
 static/tty03
-static/child_opened_proc
-static/cow01
-static/fpu00
-static/fpu01
-static/mmx00
-static/sse00
-static/sse20
-static/fdt_shared
-static/file_locks00
-static/file_locks01
-static/sigpending
 static/sigaltstack
 static/sk-netlink
-static/proc-self
-static/file_fown
 static/socket-ext
 static/socket-tcp
 static/socket-tcp6
@@ -100,7 +120,6 @@ streaming/socket-tcp6
 static/socket-tcpbuf
 static/socket-tcpbuf6
 static/pty03
-static/mountpoints
 ns/static/session00
 ns/static/session01
 static/ipc_namespace
@@ -108,5 +127,4 @@ static/shm
 static/msgque
 static/sem
 transition/ipc
-static/sigpending
 static/sk-netlink
