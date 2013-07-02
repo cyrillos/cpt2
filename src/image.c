@@ -68,6 +68,7 @@ GEN_SHOW_STUB(show_tcp_stream);
 GEN_SHOW_STUB(show_mountpoints);
 GEN_SHOW_STUB(show_netdevices);
 GEN_SHOW_STUB(show_stats);
+GEN_SHOW_STUB(show_posix_timers);
 
 int open_image(context_t *ctx, int type, int flags, ...)
 {

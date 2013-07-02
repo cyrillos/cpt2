@@ -16,7 +16,7 @@
 #include "bug.h"
 
 #include "protobuf.h"
-#include "protobuf/itimer.pb-c.h"
+#include "protobuf/timer.pb-c.h"
 
 u16 image_HZ;
 
