@@ -108,17 +108,21 @@ $(CRIUDIR)/protobuf/built-in.o:
 $(CRIUDIR)/include/config.h:
 	$(Q) $(MAKE) -C $(CRIUDIR)/ config
 
+$(CRIUDIR)/arch/$(ARCH)/syscalls.built-in.o: $(CRIUDIR)/include/config.h
+	$(Q) $(MAKE) -C $(CRIUDIR)/ arch/$(ARCH)/syscalls.built-in.o
+
 protobuf: $(CRIUDIR)/protobuf/built-in.o
 config: $(CRIUDIR)/include/config.h
+syscalls: $(CRIUDIR)/arch/$(ARCH)/syscalls.built-in.o config
 
 src/res/%:
 	$(Q) $(MAKE) $(build)=src/res $@
 src/res/built-in.o:
 	$(Q) $(MAKE) $(build)=src/res $@
 
-src/%: protobuf config src/res/built-in.o 
+src/%: protobuf syscalls config src/res/built-in.o
 	$(Q) $(MAKE) $(build)=src $@
-src/built-in.o: src protobuf config src/res/built-in.o
+src/built-in.o: src protobuf syscalls config src/res/built-in.o
 	$(Q) $(MAKE) $(build)=src all
 
 $(PROGRAM): src/built-in.o src/res/built-in.o $(CRIUDIR)/protobuf/built-in.o $(CRIUDIR)/image-desc.o $(CRIUDIR)/protobuf-desc.o
