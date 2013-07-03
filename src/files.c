@@ -751,7 +751,16 @@ static int write_flock(context_t *ctx, struct file_struct *file,
 	e.pid	= sprig->u.fli.cpt_pid;
 	e.fd	= fd->fdi.cpt_fd;
 	e.start	= sprig->u.fli.cpt_start;
-	e.len	= sprig->u.fli.cpt_end - sprig->u.fli.cpt_start;
+
+#ifndef OFFSET_MAX
+#define INT_LIMIT(x)	(~((x)1ull << (sizeof(x) * 8 - 1)))
+#define OFFSET_MAX	INT_LIMIT(unsigned long long)
+#endif
+
+	if (sprig->u.fli.cpt_end == OFFSET_MAX)
+		e.len = 0;
+	else
+		e.len = (sprig->u.fli.cpt_end + 1) - sprig->u.fli.cpt_start;
 
 	return pb_write_one(image_fd, &e, PB_FILE_LOCK);
 }
