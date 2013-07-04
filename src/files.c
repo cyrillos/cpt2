@@ -1115,10 +1115,9 @@ void free_files(context_t *ctx)
 static void show_fd_cont(context_t *ctx, struct fd_struct *fd)
 {
 	struct file_struct *file = obj_lookup_to(CPT_OBJ_FILE, fd->fdi.cpt_file);
-	obj_t *obj = file ? obj_of(file) : NULL;
 
-	pr_debug("\t\t@%-10li fd %8d flags %6x file @%-10li (name --> %s)\n",
-		 obj ? (long)obj->o_pos : -1, fd->fdi.cpt_fd, fd->fdi.cpt_flags,
+	pr_debug("\t\t@%-10li fd %8d flags %6x file @%-10lu (name --> %s)\n",
+		 obj_pos_of(fd), fd->fdi.cpt_fd, fd->fdi.cpt_flags,
 		 (long)fd->fdi.cpt_file, file ? file->name : "");
 }
 
