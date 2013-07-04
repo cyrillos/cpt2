@@ -226,14 +226,14 @@ static int write_unix_socket(context_t *ctx,
 	if (sk->si.cpt_peer != -1) {
 		peer = sk_lookup_index(sk->si.cpt_peer);
 		if (!peer) {
-			pr_err("No peer with index %d found at @%li\n",
+			pr_err("No peer with index %#x found at @%li\n",
 			       (int)sk->si.cpt_peer, obj_pos_of(file));
 			return -1;
 		}
 
 		peer_inode = socket_inode(peer);
 		if (!peer_inode) {
-			pr_err("No inode for peer %d found at @%li\n",
+			pr_err("No inode for peer %#x found at @%li\n",
 			       (int)sk->si.cpt_peer, obj_pos_of(file));
 			return -1;
 		}
@@ -890,7 +890,7 @@ int read_ifaddr(context_t *ctx)
 		}
 
 		if (!netdev_lookup(ifa->ii.cpt_index)) {
-			pr_err("No net device with index %u at @%li\n",
+			pr_err("No net device with index %#x at @%li\n",
 			       ifa->ii.cpt_index, (long)start);
 			obj_free_to(ifa);
 			return -1;
