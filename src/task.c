@@ -104,7 +104,7 @@ static int read_core_fpu(context_t *ctx, struct task_struct *t, CoreEntry *core)
 		}
 
 		if (read_data(ctx->fd, &xsave.i387, sizeof(xsave.i387), false)) {
-			pr_err("Can't read bits at %li\n", (long)t->aux_pos.off_fxsave);
+			pr_err("Can't read bits at @%li\n", (long)t->aux_pos.off_fxsave);
 			return -1;
 		}
 
@@ -884,12 +884,12 @@ static void show_task_cont(context_t *ctx, struct task_struct *t)
 {
 	struct cpt_task_image *ti = &t->ti;
 
-	pr_debug("\t@%-8li pid %6d tgid %6d ppid %6d rppid %6d pgrp %6d\n"
+	pr_debug("\t@%-10li pid %6d tgid %6d ppid %6d rppid %6d pgrp %6d\n"
 		 "\t\tcomm '%s' session %d leader %d 64bit %d\n"
-		 "\t\tmm @%-8ld files @%-8ld fs @%-8ld signal @%-8ld sighand @%-8ld\n"
-		 "\t\tstate @%-8ld exit_code @%-8ld posix_timers @%-8ld\n"
+		 "\t\tmm @%-10li files @%-10li fs @%-10li signal @%-10li sighand @%-10li\n"
+		 "\t\tstate %-8ld exit_code %-8ld posix_timers @%-10li\n"
 		 "\t\t\t%s\n",
-		 (long)obj_of(t)->o_pos, ti->cpt_pid, ti->cpt_tgid, ti->cpt_ppid,
+		 obj_pos_of(t), ti->cpt_pid, ti->cpt_tgid, ti->cpt_ppid,
 		 ti->cpt_rppid, ti->cpt_pgrp, ti->cpt_comm, ti->cpt_session,
 		 ti->cpt_leader,ti->cpt_64bit, (long)ti->cpt_mm,
 		 (long)ti->cpt_files, (long)ti->cpt_fs,
@@ -908,7 +908,7 @@ static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
 	     start += h.cpt_next) {
 
 		if (read_obj_hdr(ctx->fd, &h, start)) {
-			pr_err("Can't read task data header at %li\n", (long)start);
+			pr_err("Can't read task data header at @%li\n", (long)start);
 			return -1;
 		}
 
@@ -946,7 +946,7 @@ static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
 		case CPT_OBJ_SIGNAL_STRUCT:
 			t->aux_pos.off_signal = start;
 			if (t->aux_pos.off_signal != t->ti.cpt_signal) {
-				pr_err("Image corruption @%-8li @%-8li\n",
+				pr_err("Image corruption @%-10li @%-10li\n",
 				       (long)t->aux_pos.off_signal,
 				       (long)t->ti.cpt_signal);
 				return -1;
@@ -970,9 +970,9 @@ static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
 		}
 	}
 
-	pr_debug("\t\t\toffs: @%-8li @%-8li @%-8li @%-8li\n"
-		 "\t\t\t      @%-8li @%-8li @%-8li @%-8li\n"
-		 "\t\t\t      @%-8li @%-8li @%-8li\n",
+	pr_debug("\t\t\toffs: @%-10li @%-10li @%-10li @%-10li\n"
+		 "\t\t\t      @%-10li @%-10li @%-10li @%-10li\n"
+		 "\t\t\t      @%-10li @%-10li @%-10li\n",
 		 (long)t->aux_pos.off_kstack, (long)t->aux_pos.off_gpr,
 		 (long)t->aux_pos.off_xsave, (long)t->aux_pos.off_fsave,
 		 (long)t->aux_pos.off_fxsave, (long)t->aux_pos.off_lastsiginfo,
@@ -992,8 +992,7 @@ static int validate_task_early(context_t *ctx, struct task_struct *t)
 {
 	if (!t->ti.cpt_64bit) {
 		pr_err("Unsupported IA32 task (pid %d comm %s) at @%li\n",
-		       t->ti.cpt_pid, t->ti.cpt_comm,
-		       (long)obj_of(t)->o_pos);
+		       t->ti.cpt_pid, t->ti.cpt_comm, obj_pos_of(t));
 		return -1;
 	}
 
@@ -1001,12 +1000,12 @@ static int validate_task_early(context_t *ctx, struct task_struct *t)
 	 * At least GPR and FPU must be present.
 	 */
 	if (!t->aux_pos.off_gpr || (!t->aux_pos.off_xsave && !t->aux_pos.off_fxsave)) {
-		pr_err("Incomplete/corrupted data (%li %li %li) in task "
+		pr_err("Incomplete/corrupted data (@%li @%li @%li) in task "
 		       "(pid %d comm %s) at @%li\n",
-		       t->aux_pos.off_gpr, t->aux_pos.off_xsave,
-		       t->aux_pos.off_fxsave,
+		       (long)t->aux_pos.off_gpr, (long)t->aux_pos.off_xsave,
+		       (long)t->aux_pos.off_fxsave,
 		       t->ti.cpt_pid, t->ti.cpt_comm,
-		       (long)obj_of(t)->o_pos);
+		       obj_pos_of(t));
 		return -1;
 	}
 
@@ -1063,7 +1062,7 @@ int read_tasks(context_t *ctx)
 
 		if (read_obj(ctx->fd, CPT_OBJ_TASK, &task->ti, sizeof(task->ti), start)) {
 			obj_free_to(task);
-			pr_err("Can't read task object at %li\n", (long)start);
+			pr_err("Can't read task object at @%li\n", (long)start);
 			return -1;
 		}
 

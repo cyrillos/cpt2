@@ -56,7 +56,7 @@ static int write_epoll_tfds(context_t *ctx, struct file_struct *file, struct epo
 
 	for (; start < end; start += efi.cpt_next) {
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_EPOLL_FILE, &efi, start)) {
-			pr_err("Can't read epoll fd at %li\n", (long)start);
+			pr_err("Can't read epoll fd at @%li\n", (long)start);
 			goto err;
 		}
 
@@ -105,8 +105,8 @@ int write_epoll(context_t *ctx, struct file_struct *file)
 
 static void show_epoll_cont(context_t *ctx, struct epoll_struct *epoll)
 {
-	pr_debug("\t@%-8li file @%-8li\n",
-		 (long)obj_of(epoll)->o_pos, (long)epoll->ei.cpt_file);
+	pr_debug("\t@%-10li file @%-10li\n",
+		 obj_pos_of(epoll), (long)epoll->ei.cpt_file);
 }
 
 int read_epolls(context_t *ctx)

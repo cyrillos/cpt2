@@ -137,14 +137,14 @@ int write_tty_entry(context_t *ctx, struct file_struct *file)
 	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("Can't find inode for file at @%li\n",
-		       (long)obj_of(file)->o_pos);
+		       obj_pos_of(file));
 		return -1;
 	}
 
 	tty = obj_lookup_to(CPT_OBJ_TTY, file->fi.cpt_priv);
 	if (!tty) {
 		pr_err("Can't find tty @%li for file at @%li\n",
-		       (long)obj_of(file)->o_pos, (long)file->fi.cpt_priv);
+		       obj_pos_of(file), (long)file->fi.cpt_priv);
 		return -1;
 	}
 
@@ -167,9 +167,9 @@ int write_tty_entry(context_t *ctx, struct file_struct *file)
 
 static void show_tty_cont(context_t *ctx, struct tty_struct *tty)
 {
-	pr_debug("\t@%-8li flags %#16lx link %#8x index %#8x type %#8x subtype %#8x\n"
+	pr_debug("\t@%-10li flags %#16lx link %#8x index %#8x type %#8x subtype %#8x\n"
 		 "\t\tpgrp %8d session %8d name %s\n",
-		 (long)obj_of(tty)->o_pos, (long)tty->ti.cpt_flags,
+		 obj_pos_of(tty), (long)tty->ti.cpt_flags,
 		 tty->ti.cpt_link, tty->ti.cpt_index,
 		 tty->ti.cpt_drv_type, tty->ti.cpt_drv_subtype,
 		 tty->ti.cpt_pgrp, tty->ti.cpt_session, tty->ti.cpt_name);

@@ -83,7 +83,7 @@ char *read_name(int fd, off_t pos, size_t *read_bytes, off_t *next)
 	struct cpt_object_hdr h;
 
 	if (read_obj_cpt(fd, -1, &h, pos)) {
-		pr_err("Can't read header at %li\n", (long)pos);
+		pr_err("Can't read header at @%li\n", (long)pos);
 		return ERR_PTR(-EIO);
 	}
 
@@ -124,8 +124,8 @@ static int parse_sections(context_t *ctx)
 	end = ctx->st.st_size - sizeof(ctx->t) - sizeof(h);
 
 	pr_read_start("sections\n");
-	pr_debug("\t    type           start          end"
-		 "                             name full\n");
+	pr_debug("\t    type    start         end"
+		 "                       name full\n");
 	while (start < end) {
 		if (__read_ptr_at(ctx->fd, &h, start))
 			return -1;
@@ -138,7 +138,7 @@ static int parse_sections(context_t *ctx)
 		if (h.cpt_section >= CPT_SECT_MAX)
 			goto err;
 
-		pr_debug("\t%8d    %12li %12li %32s %c\n",
+		pr_debug("\t%8d    @%-12li @%-12li %16s %c\n",
 			 h.cpt_section, (long)start,
 			 (long)(start + h.cpt_next),
 			 section_name(h.cpt_section),

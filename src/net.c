@@ -477,7 +477,7 @@ int write_socket(context_t *ctx, struct file_struct *file)
 		break;
 	default:
 		pr_err("File at @%li with unsupported sock family %d\n",
-		       (long)obj_of(file)->o_pos, (int)sk->si.cpt_family);
+		       obj_pos_of(file), (int)sk->si.cpt_family);
 		break;
 	}
 
@@ -534,10 +534,10 @@ static void show_sock_addrs(struct sock_struct *sk)
 
 static void show_sock_cont(context_t *ctx, struct sock_struct *sk)
 {
-	pr_debug("\t@%-8li file %8li parent %8d index %#x type %6d family %6d state %d\n"
+	pr_debug("\t@%-10li file @%-10li parent %8d index %#x type %6d family %6d state %d\n"
 		 "\t\tssflags %#lx sstate %#2x reuse %#2x zapped %#2x shutdown %#2x protocol %#2x\n"
 		 "\t\tflags %#lx peer %#x socketpair %#2x sockflags %#2x cpt_bound_dev_if %#2x\n",
-		 (long)obj_of(sk)->o_pos, (long)sk->si.cpt_file, sk->si.cpt_parent,
+		 obj_pos_of(sk), (long)sk->si.cpt_file, sk->si.cpt_parent,
 		 sk->si.cpt_index, (int)sk->si.cpt_type, (int)sk->si.cpt_family,
 		 (int)sk->si.cpt_state, (long)sk->si.cpt_ssflags, sk->si.cpt_sstate,
 		 sk->si.cpt_reuse, sk->si.cpt_zapped, sk->si.cpt_shutdown, sk->si.cpt_protocol,
@@ -712,8 +712,8 @@ static void show_netdev_cont(context_t *ctx, struct netdev_struct *dev)
 {
 	unsigned int i;
 
-	pr_debug("\t@%-8li index %#8x flags %#8x mtu %#8x -> %s\n",
-		 (long)obj_of(dev)->o_pos, dev->ni.cpt_index,
+	pr_debug("\t@%-10li index %#8x flags %#8x mtu %#8x -> %s\n",
+		 obj_pos_of(dev), dev->ni.cpt_index,
 		 dev->ni.cpt_flags, dev->ni.cpt_mtu, dev->ni.cpt_name);
 
 	pr_debug("\t\tmac: ");
@@ -852,8 +852,8 @@ int write_ifaddr(context_t *ctx)
 
 static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
 {
-	pr_debug("\t@%-8li index %#8x family %#1x masklen %#1x "
-		 "flags %#1x scope %#1x -> %s\n", (long)obj_of(ifa)->o_pos,
+	pr_debug("\t@%-10li index %#8x family %#1x masklen %#1x "
+		 "flags %#1x scope %#1x -> %s\n", obj_pos_of(ifa),
 		 ifa->ii.cpt_index, (int)ifa->ii.cpt_family, (int)ifa->ii.cpt_masklen,
 		 (int)ifa->ii.cpt_flags, (int)ifa->ii.cpt_scope, (char *)ifa->ii.cpt_label);
 }

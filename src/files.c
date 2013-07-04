@@ -163,7 +163,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 		sk = sk_lookup_file(obj_of(file)->o_pos);
 		if (!sk) {
 			pr_err("Can't find socket for @%li\n",
-			       (long)obj_of(file)->o_pos);
+			       obj_pos_of(file));
 			return -1;
 		}
 		switch (sk->si.cpt_family) {
@@ -182,13 +182,13 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 			break;
 		default:
 			pr_err("File at @%li with unsupported sock family %d\n",
-			       (long)obj_of(file)->o_pos, (int)sk->si.cpt_family);
+			       obj_pos_of(file), (int)sk->si.cpt_family);
 			return -1;
 		}
 	} else if (S_ISCHR(file->fi.cpt_i_mode)) {
 		if (!inode) {
 			pr_err("Character file without inode at @%li\n",
-			       (long)obj_of(file)->o_pos);
+			       obj_pos_of(file));
 			return -1;
 		}
 		switch (kdev_major(inode->ii.cpt_rdev)) {
@@ -202,7 +202,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 			break;
 		default:
 			pr_err("Character file with maj %d inode at @%li\n",
-			       major(inode->ii.cpt_rdev), (long)obj_of(file)->o_pos);
+			       major(inode->ii.cpt_rdev), obj_pos_of(file));
 			return -1;
 		}
 	} else if (S_ISDIR(file->fi.cpt_i_mode)) {
@@ -210,7 +210,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 	} else if (S_ISFIFO(file->fi.cpt_i_mode)) {
 		if (!inode) {
 			pr_err("Fifo file without inode at @%li\n",
-			       (long)obj_of(file)->o_pos);
+			       obj_pos_of(file));
 			return -1;
 		}
 		if (inode->ii.cpt_sb == PIPEFS_MAGIC)
@@ -221,8 +221,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 		if (get_file_type(e, file) == 0)
 			return 0;
 
-		pr_err("File with unknown type at @%li\n",
-			(long)obj_of(file)->o_pos);
+		pr_err("File with unknown type at @%li\n", obj_pos_of(file));
 		return -1;
 	}
 
@@ -330,25 +329,25 @@ static int dump_ghost_file_content(context_t *ctx, int fd,
 	 */
 	for (; start < end; start += u.h.cpt_next) {
 		if (read_obj_cpt(ctx->fd, OBJ_ANY, &u.h, start)) {
-			pr_err("Can't read page header at %li\n", (long)start);
+			pr_err("Can't read page header at @%li\n", (long)start);
 			goto err;
 		}
 
 		switch (u.h.cpt_object) {
 		case CPT_OBJ_PAGES:
 			if (read_obj_cont(ctx->fd, &u.pb)) {
-				pr_err("Can't read page at %li\n", (long)start);
+				pr_err("Can't read page at @%li\n", (long)start);
 				goto err;
 			}
 
 			if (u.h.cpt_content != CPT_CONTENT_DATA) {
-				pr_err("Unexpected object content %d at %li\n",
+				pr_err("Unexpected object content %d at @%li\n",
 				       u.h.cpt_content, (long)start);
 				goto err;
 			}
 			break;
 		default:
-			pr_err("Unexpected object %d at %li\n",
+			pr_err("Unexpected object %d at @%li\n",
 			       u.h.cpt_object, (long)start);
 			goto err;
 		}
@@ -362,7 +361,7 @@ static int dump_ghost_file_content(context_t *ctx, int fd,
 		nr_pages = PAGES(u.h.cpt_next - u.h.cpt_hdrlen);
 		i = PAGES(u.pb.cpt_end - u.pb.cpt_start);
 		if (nr_pages != i) {
-			pr_err("Broken pages count (%li/%li) at %li\n",
+			pr_err("Broken pages count (%li/%li) at @%li\n",
 			       nr_pages, i, (long)start);
 			goto err;
 		}
@@ -510,7 +509,7 @@ int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 
 	if (check_path_remap(ctx, file)) {
 		pr_err("Failed to check remapping on file at @%li\n",
-			(long)obj_of(file)->o_pos);
+		       obj_pos_of(file));
 		return -1;
 	}
 
@@ -897,9 +896,9 @@ void free_inodes(context_t *ctx)
 
 static void show_inode_cont(context_t *ctx, struct inode_struct *inode)
 {
-	pr_debug("\t@%-8li dev %10li ino %10li mode %6d nlink %6d "
-		 "size %10li rdev %10li sb %10li vfsmount @%-8li (payload %li)\n",
-		 (long)obj_of(inode)->o_pos, (long)inode->ii.cpt_dev,
+	pr_debug("\t@%-10li dev %10li ino %10li mode %6d nlink %6d "
+		 "size %10li rdev %10li sb %10li vfsmount @%-10li (payload %li)\n",
+		 obj_pos_of(inode), (long)inode->ii.cpt_dev,
 		 (long)inode->ii.cpt_ino, inode->ii.cpt_mode, inode->ii.cpt_nlink,
 		 (long)inode->ii.cpt_size, (long)inode->ii.cpt_rdev,
 		 (long)inode->ii.cpt_sb, (long)inode->ii.cpt_vfsmount,
@@ -942,9 +941,9 @@ static void show_file_cont(context_t *ctx, struct file_struct *file)
 {
 	unsigned int i;
 
-	pr_debug("\t@%-8li flags %8d mode %6d pos %16li\n"
-		 "\t\ti_mode %6d lflags %6d inode @%-8li vfsmount @%-8li --> %s\n",
-		(long)obj_of(file)->o_pos, file->fi.cpt_flags, file->fi.cpt_mode,
+	pr_debug("\t@%-10li flags %8d mode %6d pos %16li\n"
+		 "\t\ti_mode %6d lflags %6d inode @%-10li vfsmount @%-10li --> %s\n",
+		obj_pos_of(file), file->fi.cpt_flags, file->fi.cpt_mode,
 		(long)file->fi.cpt_pos, file->fi.cpt_i_mode,
 		file->fi.cpt_lflags, (long)file->fi.cpt_inode,
 		(long)file->fi.cpt_vfsmount, file->name);
@@ -960,10 +959,10 @@ static void show_file_cont(context_t *ctx, struct file_struct *file)
 	if (file->sprig) {
 		switch (file->sprig->u.hdr.cpt_object) {
 		case CPT_OBJ_TIMERFD:
-			pr_debug("\t\t\t\t@%-8li timerfd"
+			pr_debug("\t\t\t\t@%-10li timerfd"
 				 "\t\t\t\t\tit_value %-8li it_interval %-8li\n"
 				 "\t\t\t\t\tticks %-8li expired %-4i clockid %-4i\n",
-				 (long)obj_of(file->sprig)->o_pos,
+				 obj_pos_of(file->sprig),
 				 (long)file->sprig->u.tfi.cpt_it_value,
 				 (long)file->sprig->u.tfi.cpt_it_interval,
 				 (long)file->sprig->u.tfi.cpt_ticks,
@@ -971,18 +970,18 @@ static void show_file_cont(context_t *ctx, struct file_struct *file)
 				 file->sprig->u.tfi.cpt_clockid);
 			break;
 		case CPT_OBJ_EVENTFD:
-			pr_debug("\t\t\t\t@%-8li eventfd"
+			pr_debug("\t\t\t\t@%-10li eventfd"
 				 "\t\t\t\t\tcount %-8li flags %-4i\n",
-				 (long)obj_of(file->sprig)->o_pos,
+				 obj_pos_of(file->sprig),
 				 (long)file->sprig->u.efi.cpt_count,
 				 file->sprig->u.efi.cpt_flags);
 			break;
 		case CPT_OBJ_FLOCK:
-			pr_debug("\t\t\t\t@%-8li flock"
+			pr_debug("\t\t\t\t@%-10li flock"
 				 "\t\t\t\t\towner %-4i pid %-4i\n"
 				 "\t\t\t\t\tstart %-8li end %-8li flags %-4i\n"
 				 "\t\t\t\t\ttype %-4i svid %-4i",
-				 (long)obj_of(file->sprig)->o_pos,
+				 obj_pos_of(file->sprig),
 				 file->sprig->u.fli.cpt_owner,
 				 file->sprig->u.fli.cpt_pid,
 				 (long)file->sprig->u.fli.cpt_start,
@@ -1118,16 +1117,16 @@ static void show_fd_cont(context_t *ctx, struct fd_struct *fd)
 	struct file_struct *file = obj_lookup_to(CPT_OBJ_FILE, fd->fdi.cpt_file);
 	obj_t *obj = file ? obj_of(file) : NULL;
 
-	pr_debug("\t\t@%-8li fd %8d flags %6x file @%-8li (name --> %s)\n",
-		obj ? (long)obj->o_pos : -1, fd->fdi.cpt_fd, fd->fdi.cpt_flags,
-		(long)fd->fdi.cpt_file, file ? file->name : "");
+	pr_debug("\t\t@%-10li fd %8d flags %6x file @%-10li (name --> %s)\n",
+		 obj ? (long)obj->o_pos : -1, fd->fdi.cpt_fd, fd->fdi.cpt_flags,
+		 (long)fd->fdi.cpt_file, file ? file->name : "");
 }
 
 static void show_files_cont(context_t *ctx, struct files_struct *files)
 {
-	pr_debug("\t@%-8li index %8d cpt_max_fds %6d cpt_next_fd %6d\n",
-		(long)obj_of(files)->o_pos, files->fsi.cpt_index,
-		files->fsi.cpt_max_fds, files->fsi.cpt_next_fd);
+	pr_debug("\t@%-10li index %8d cpt_max_fds %6d cpt_next_fd %6d\n",
+		 obj_pos_of(files), files->fsi.cpt_index,
+		 files->fsi.cpt_max_fds, files->fsi.cpt_next_fd);
 }
 
 int read_files(context_t *ctx)
@@ -1256,12 +1255,12 @@ out:
 
 static void show_fs_cont(context_t *ctx, struct fs_struct *fs)
 {
-	pr_debug("\t@%-8li cpt_umask %#6x\n"
-		 "\t\troot @%-8li (name --> %s)\n"
-		 "\t\tcwd  @%-8li (name --> %s)\n",
-		 (long)obj_of(fs)->o_pos, fs->fsi.cpt_umask,
-		 (long)obj_of(fs->root)->o_pos, fs->root->name,
-		 (long)obj_of(fs->cwd)->o_pos, fs->cwd->name);
+	pr_debug("\t@%-10li cpt_umask %#6x\n"
+		 "\t\troot @%-10li (name --> %s)\n"
+		 "\t\tcwd  @%-10li (name --> %s)\n",
+		 obj_pos_of(fs), fs->fsi.cpt_umask,
+		 obj_pos_of(fs->root), fs->root->name,
+		 obj_pos_of(fs->cwd), fs->cwd->name);
 }
 
 int read_fs(context_t *ctx)

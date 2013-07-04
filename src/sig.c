@@ -207,8 +207,7 @@ static void show_sighand_cont(context_t *ctx, struct sighand_struct *s)
 {
 	unsigned int i;
 
-	pr_debug("\t@%-8li nr-signals %d\n",
-		(long)obj_of(s)->o_pos, s->nr_signals);
+	pr_debug("\t@%-10li nr-signals %d\n", obj_pos_of(s), s->nr_signals);
 
 	for (i = 0; i < ARRAY_SIZE(s->sig); i++) {
 		if (s->sig[i].cpt_handler != (u64)SIG_DFL || s->sig[i].cpt_flags) {

@@ -43,8 +43,8 @@ void free_ns(context_t *ctx)
 
 static void show_vfsmnt_cont(context_t *ctx, struct vfsmnt_struct *v)
 {
-	pr_debug("\t@%-8li dev %-32s point %-32s type %-16s\n",
-		(long)obj_of(v)->o_pos, v->mnt_dev, v->mnt_point, v->mnt_type);
+	pr_debug("\t@%-10li dev %-32s point %-32s type %-16s\n",
+		obj_pos_of(v), v->mnt_dev, v->mnt_point, v->mnt_type);
 }
 
 static char *mnt_fstypes[] = {
@@ -168,7 +168,7 @@ int read_ns(context_t *ctx)
 		off_t pos, next;
 
 		if (read_obj_hdr(ctx->fd, &h, start)) {
-			pr_err("Can't read header in NS at %li\n", (long)start);
+			pr_err("Can't read header in NS at @%li\n", (long)start);
 			goto out;
 		}
 
@@ -184,7 +184,7 @@ int read_ns(context_t *ctx)
 		memcpy(&v->vfsmnt, &h, sizeof(h));
 
 		if (read_obj_cont(ctx->fd, &v->vfsmnt)) {
-			pr_err("Can't read vfsmount payload at %li\n", (long)start);
+			pr_err("Can't read vfsmount payload at @%li\n", (long)start);
 			goto free;
 		}
 

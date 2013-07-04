@@ -110,9 +110,9 @@ static void show_mmi_cont(context_t *ctx, struct mm_struct *mm)
 {
 	struct cpt_mm_image *mmi = &mm->mmi;
 
-	pr_debug("\t@%-8li start_code 0x%-16lx end_code  0x%-16lx "
+	pr_debug("\t@%-10li start_code 0x%-16lx end_code  0x%-16lx "
 		 "start_data 0x%-16lx  end_data 0x%-16lx mm_flags 0x%-16lx\n",
-		 (long)obj_of(mm)->o_pos,
+		 obj_pos_of(mm),
 		 (long)mmi->cpt_start_code, (long)mmi->cpt_end_code,
 		 (long)mmi->cpt_start_data, (long)mmi->cpt_end_data,
 		 (long)mmi->cpt_mm_flags);
@@ -165,7 +165,7 @@ static bool should_dump_vma(struct vma_struct *vma)
 
 	if (!vma_is(vma, VMA_ANON_PRIVATE | VMA_FILE_PRIVATE)) {
 		pr_warn("Unexpected VMA area found (@%li %#x)\n",
-			obj_of(vma)->o_pos, vma->status);
+			obj_pos_of(vma), vma->status);
 		return false;
 	}
 
@@ -212,13 +212,13 @@ static int write_vdso_pages(context_t *ctx, int pagemap_fd, int page_fd,
 		goto err;
 
 	if (__write(page_fd, src, size)) {
-		pr_err("Can't write vDSO pages at %li\n",
+		pr_err("Can't write vDSO pages at @%li\n",
 		       obj_pos_of(vma));
 		goto err;
 	}
 
 	if (__write(page_fd, zero_page, aligned - size)) {
-		pr_err("Can't write vDSO zero pages at %li\n",
+		pr_err("Can't write vDSO zero pages at @%li\n",
 		       obj_pos_of(vma));
 		goto err;
 	}
@@ -290,31 +290,31 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 
 	for (; start < end; start += u.h.cpt_next) {
 		if (read_obj_cpt(ctx->fd, OBJ_ANY, &u.h, start)) {
-			pr_err("Can't read page header at %li\n", (long)start);
+			pr_err("Can't read page header at @%li\n", (long)start);
 			goto err;
 		}
 
 		switch (u.h.cpt_object) {
 		case CPT_OBJ_PAGES:
 			if (read_obj_cont(ctx->fd, &u.pb)) {
-				pr_err("Can't read page at %li\n", (long)start);
+				pr_err("Can't read page at @%li\n", (long)start);
 				goto err;
 			}
 
 			if (u.h.cpt_content != CPT_CONTENT_DATA) {
-				pr_err("Unexpected object content %d at %li\n",
+				pr_err("Unexpected object content %d at @%li\n",
 				       u.h.cpt_content, (long)start);
 				goto err;
 			}
 			break;
 		case CPT_OBJ_COPYPAGES:
 			if (read_obj_cont(ctx->fd, &u.cpb)) {
-				pr_err("Can't read page at %li\n", (long)start);
+				pr_err("Can't read page at @%li\n", (long)start);
 				goto err;
 			}
 
 			if (u.h.cpt_content != CPT_CONTENT_VOID) {
-				pr_err("Unexpected object content %d at %li\n",
+				pr_err("Unexpected object content %d at @%li\n",
 				       u.h.cpt_content, (long)start);
 				goto err;
 			}
@@ -328,7 +328,7 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 		case CPT_OBJ_ITERPAGES:
 		case CPT_OBJ_ITERYOUNGPAGES:
 		default:
-			pr_err("Unexpected object %d at %li\n",
+			pr_err("Unexpected object %d at @%li\n",
 			       u.h.cpt_object, (long)start);
 			goto err;
 		}
@@ -342,7 +342,7 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 		nr_pages = PAGES(u.h.cpt_next - u.h.cpt_hdrlen);
 		i = PAGES(u.pb.cpt_end - u.pb.cpt_start);
 		if (nr_pages != i) {
-			pr_err("Broken pages count (%li/%li) at %li\n",
+			pr_err("Broken pages count (%li/%li) at @%li\n",
 			       nr_pages, i, (long)start);
 			goto err;
 		}
@@ -361,11 +361,11 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 				goto err;
 			for (i = 0; i < nr_pages; i++) {
 				if (__read(ctx->fd, page, sizeof(page))) {
-					pr_err("Can't read page at %li\n",
+					pr_err("Can't read page at @%li\n",
 					       (long)start);
 					goto err;
 				} else if (__write(page_fd, page, sizeof(page))) {
-					pr_err("Can't write page at %li\n",
+					pr_err("Can't write page at @%li\n",
 					       (long)start);
 					goto err;
 				}
@@ -382,7 +382,7 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 				pe.nr_pages--;
 
 				if (lseek(ctx->fd, PAGE_SIZE, SEEK_CUR) == (off_t)-1) {
-					pr_perror("Failed to lookup on page at %li",
+					pr_perror("Failed to lookup on page at @%li",
 						  (long)start);
 					goto err;
 				}
@@ -395,11 +395,11 @@ static int write_page_block(context_t *ctx, int pagemap_fd, int page_fd,
 			     i < pe.nr_pages && addr_start < addr_end;
 			     i++, addr_start += PAGE_SIZE) {
 				if (__read(ctx->fd, page, sizeof(page))) {
-					pr_err("Can't read page at %li\n",
+					pr_err("Can't read page at @%li\n",
 					       (long)start);
 					goto err;
 				} else if (__write(page_fd, page, sizeof(page))) {
-					pr_err("Can't write page at %li\n",
+					pr_err("Can't write page at @%li\n",
 					       (long)start);
 					goto err;
 				}
@@ -542,8 +542,7 @@ int write_pages(context_t *ctx, pid_t pid, off_t cpt_mm)
 
 		ret = write_vma_pages(ctx, pagemap_fd, page_fd, vma);
 		if (ret) {
-			pr_err("Can't write pages header at %li\n",
-			       (long)obj_of(vma)->o_pos);
+			pr_err("Can't write pages header at @%li\n", obj_pos_of(vma));
 			goto err;
 		}
 	}
@@ -641,8 +640,7 @@ int write_vmas(context_t *ctx, pid_t pid, off_t cpt_mm)
 		}
 
 		if (pb_write_one(fd_vmas, &e, PB_VMAS)) {
-			pr_err("Can't write VMA at %li\n",
-			       (long)obj_of(vma)->o_pos);
+			pr_err("Can't write VMA at @%li\n", obj_pos_of(vma));
 			goto err;
 		}
 	}
@@ -703,7 +701,7 @@ static void show_auxv_cont(context_t *ctx, struct mm_struct *mm)
 {
 	unsigned int i;
 
-	pr_debug("\t\tauxv @%-8li\n", (long)mm->auxv.start);
+	pr_debug("\t\tauxv @%-10li\n", (long)mm->auxv.start);
 
 	pr_debug("\t\t\t");
 	for (i = 0; i < mm->auxv.nwords; i++) {
@@ -717,7 +715,7 @@ static void show_auxv_cont(context_t *ctx, struct mm_struct *mm)
 static int read_mm_auxv(context_t *ctx, struct mm_struct *mm, off_t start, off_t end)
 {
 	if (read_obj_hdr(ctx->fd, &mm->auxv.hdr, start)) {
-		pr_err("Can't read AUXV header at %li\n", (long)start);
+		pr_err("Can't read AUXV header at @%li\n", (long)start);
 		return -1;
 	}
 
@@ -731,7 +729,7 @@ static int read_mm_auxv(context_t *ctx, struct mm_struct *mm, off_t start, off_t
 
 	if (__read(ctx->fd, mm->auxv.vector,
 		   (mm->auxv.hdr.cpt_next - mm->auxv.hdr.cpt_hdrlen))) {
-		pr_err("Failed reading AUXV at %li\n", (long)start);
+		pr_err("Failed reading AUXV at @%li\n", (long)start);
 		return -1;
 	}
 
@@ -772,12 +770,12 @@ static char *vma_name(struct vma_struct *vma)
 
 static void show_vma_cont(context_t *ctx, struct vma_struct *vma)
 {
-	pr_debug("\t\tvma @%-8li file @%-8li type %2d start %#16lx end %#16lx\n"
+	pr_debug("\t\tvma @%-10li file @%-10li type %2d start %#16lx end %#16lx\n"
 		 "\t\t\tflags %#8lx pgprot %#16lx pgoff %#10lx\n"
 		 "\t\t\tanonvma %#8x anonvmaid %#8lx\n"
 		 "\t\t\t(%c%c%c) (%c) (%#x -> [%s])\n"
 		 "\t\t\t(%li direct payload bytes)\n",
-		 obj_of(vma)->o_pos, (long)vma->vmai.cpt_file,
+		 obj_pos_of(vma), (long)vma->vmai.cpt_file,
 		 vma->vmai.cpt_type, (long)vma->vmai.cpt_start,
 		 (long)vma->vmai.cpt_end, (long)vma->vmai.cpt_flags,
 		 (long)vma->vmai.cpt_pgprot, (long)vma->vmai.cpt_pgoff,
@@ -965,7 +963,7 @@ int read_mm(context_t *ctx)
 
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_MM, &mm->mmi, start)) {
 			obj_free_to(mm);
-			pr_err("Can't read task mm at %li\n", (long)start);
+			pr_err("Can't read task mm at @%li\n", (long)start);
 			return -1;
 		}
 
@@ -976,12 +974,10 @@ int read_mm(context_t *ctx)
 			goto out;
 
 		if (!mm->exec_vma) {
-			pr_err("No self-exe vma found for MM at @%li\n",
-			       (long)obj_of(mm)->o_pos);
+			pr_err("No self-exe vma found for MM at @%li\n", obj_pos_of(mm));
 			goto out;
 		} else if (!mm->auxv.nwords) {
-			pr_err("No auxv found for MM at @%li\n",
-			       (long)obj_of(mm)->o_pos);
+			pr_err("No auxv found for MM at @%li\n", obj_pos_of(mm));
 			goto out;
 		}
 

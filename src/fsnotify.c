@@ -176,17 +176,16 @@ static void show_inotify_cont(context_t *ctx, struct inotify_struct *inotify)
 {
 	struct inotify_wd_struct *wd;
 
-	pr_debug("\t@%-8li file %8li user %d max_events %d last_wd %d\n",
-		 (long)obj_of(inotify)->o_pos, (long)inotify->ii.cpt_file,
+	pr_debug("\t@%-10li file @%-10li user %d max_events %d last_wd %d\n",
+		 obj_pos_of(inotify), (long)inotify->ii.cpt_file,
 		 inotify->ii.cpt_user, inotify->ii.cpt_max_events,
 		 inotify->ii.cpt_last_wd);
 
 	list_for_each_entry(wd, &inotify->wd_list, list) {
 		pr_debug("\t\twd %d mask %x\n",
 			 wd->wdi.cpt_wd, wd->wdi.cpt_mask);
-		pr_debug("\t\t\tfile @%-8li --> %s\n",
-			 (long)obj_of(wd->file)->o_pos,
-			 wd->file->name);
+		pr_debug("\t\t\tfile @%-10li --> %s\n",
+			 obj_pos_of(wd->file), wd->file->name);
 	}
 }
 
@@ -240,7 +239,7 @@ static int read_inotify_watch(context_t *ctx, off_t start, off_t end, struct ino
 		at = obj_of(wd)->o_pos + wd->wdi.cpt_hdrlen;
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_FILE, &file->fi, at)) {
 			obj_free_to(file);
-			pr_err("Can't read file object at %li\n", (long)at);
+			pr_err("Can't read file object at @%li\n", (long)at);
 			return -1;
 		}
 
@@ -249,7 +248,7 @@ static int read_inotify_watch(context_t *ctx, off_t start, off_t end, struct ino
 
 		if (file->fi.cpt_next <= file->fi.cpt_hdrlen) {
 			pr_err("File name expected at @%li\n",
-				obj_of(file)->o_pos + file->fi.cpt_hdrlen);
+				obj_pos_of(file) + file->fi.cpt_hdrlen);
 			return -1;
 		}
 
@@ -285,7 +284,7 @@ int read_inotify(context_t *ctx)
 
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_INOTIFY, &inotify->ii, start)) {
 			obj_free_to(inotify);
-			pr_err("Can't read file object at %li\n", (long)start);
+			pr_err("Can't read file object at @%li\n", (long)start);
 			return -1;
 		}
 
