@@ -187,6 +187,12 @@ int convert(void)
 		goto out;
 	}
 
+	ret = write_extern_unix(&ctx);
+	if (ret) {
+		pr_err("Failed to write extern unix sockets\n");
+		goto out;
+	}
+
 	pr_warn("Conversion is not yet implemented and still in debug state\n");
 out:
 	read_fini(&ctx);

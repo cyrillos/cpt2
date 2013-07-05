@@ -81,9 +81,12 @@ static DEFINE_HASHTABLE(netdev_hash, NET_HASH_BITS);
 
 static LIST_HEAD(netdev_list);
 static LIST_HEAD(ifaddr_list);
+static LIST_HEAD(unix_sock_list);
 
 #define PB_ALEN_INET	1
 #define PB_ALEN_INET6	4
+
+static void show_sock_cont(context_t *ctx, struct sock_struct *sk);
 
 struct sock_struct *sk_lookup_file(u64 cpt_file)
 {
@@ -208,21 +211,39 @@ static int fill_socket_opts(context_t *ctx,
 	return 0;
 }
 
-static struct inode_struct *socket_inode(struct sock_struct *sk)
+int write_extern_unix(context_t *ctx)
 {
-	struct file_struct *file;
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_UNIXSK);
+	SkOptsEntry skopts = SK_OPTS_ENTRY__INIT;
+	FownEntry fown = FOWN_ENTRY__INIT;
+	struct sock_struct *sk;
 
-	if (sk->si.cpt_file == -1)
-		return NULL;
+	list_for_each_entry(sk, &unix_sock_list, list) {
+		UnixSkEntry ue = UNIX_SK_ENTRY__INIT;
 
-	file = obj_lookup_to(CPT_OBJ_FILE, sk->si.cpt_file);
-	if (file) {
-		if (file->fi.cpt_inode == -1)
-			return NULL;
-		return obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
+		if (sk->si.cpt_type != SOCK_DGRAM) {
+			pr_err("Can't dump half of stream unix connection\n");
+			show_sock_cont(ctx, sk);
+			return -1;
+		}
+
+		ue.name.len		= (size_t)sk->si.cpt_laddrlen - 2;
+		ue.name.data		= (void *)&((char *)sk->si.cpt_laddr)[2];
+
+		ue.id			= obj_id_of(sk);
+		ue.ino			= obj_id_of(sk);
+		ue.type			= SOCK_DGRAM;
+		ue.state		= TCP_LISTEN;
+		ue.uflags		= USK_EXTERN;
+		ue.peer			= 0;
+		ue.fown			= &fown;
+		ue.opts			= &skopts;
+
+		if (pb_write_one(fd, &ue, PB_UNIXSK))
+			return -1;
 	}
 
-	return NULL;
+	return 0;
 }
 
 static int write_unix_socket(context_t *ctx,
@@ -236,7 +257,6 @@ static int write_unix_socket(context_t *ctx,
 
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_UNIXSK);
 
-	struct inode_struct *inode, *peer_inode;
 	struct sock_struct *peer;
 	int ret = -1;
 
@@ -248,14 +268,7 @@ static int write_unix_socket(context_t *ctx,
 		return -1;
 	}
 
-	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
-	if (!inode) {
-		pr_err("No inode @%li for file at @%li\n",
-		       (long)file->fi.cpt_inode, obj_pos_of(file));
-		return -1;
-	}
-
-	if (sk->si.cpt_peer != -1) {
+	if (sk->si.cpt_peer != INVALID_INDEX) {
 		peer = sk_lookup_index(sk->si.cpt_peer);
 		if (!peer) {
 			pr_err("No peer with index %#x found at @%li\n",
@@ -263,16 +276,27 @@ static int write_unix_socket(context_t *ctx,
 			return -1;
 		}
 
-		peer_inode = socket_inode(peer);
-		if (!peer_inode) {
-			pr_err("No inode for peer %#x found at @%li\n",
-			       (int)sk->si.cpt_peer, obj_pos_of(file));
-			return -1;
+		/*
+		 * Find appropriate ino if it's incoming connection.
+		 */
+		if (peer->si.cpt_file == INVALID_INDEX &&
+		    peer->si.cpt_parent != INVALID_INDEX) {
+
+			/*
+			 * It's not external socket.
+			 */
+			if (!list_empty(&peer->list))
+				list_del_init(&peer->list);
+
+			peer = sk_lookup_index(peer->si.cpt_parent);
+			if (!peer) {
+				pr_err("No icon peer with index %#x found at @%li\n",
+				       (int)sk->si.cpt_parent, obj_pos_of(file));
+				return -1;
+			}
 		}
-	} else {
+	} else
 		peer = NULL;
-		peer_inode = NULL;
-	}
 
 	fill_fown(&fown, file);
 
@@ -287,7 +311,7 @@ static int write_unix_socket(context_t *ctx,
 	}
 
 	ue.id			= obj_id_of(file);
-	ue.ino			= inode->ii.cpt_ino;
+	ue.ino			= obj_id_of(sk);
 	ue.type			= sk->si.cpt_type;
 	ue.state		= sk->si.cpt_state;
 
@@ -296,7 +320,7 @@ static int write_unix_socket(context_t *ctx,
 	/* FIXME This is valid for TCP_LISTEN only */
 	ue.backlog		= sk->si.cpt_max_ack_backlog;
 
-	ue.peer			= peer_inode ? peer_inode->ii.cpt_ino : 0;
+	ue.peer			= peer ? obj_id_of(peer) : 0;
 	ue.fown			= &fown;
 	ue.opts			= &skopts;
 	ue.uflags		= 0;
@@ -318,6 +342,7 @@ static int write_unix_socket(context_t *ctx,
 	if (!ret) {
 		file->dumped = true;
 		sk->dumped = true;
+		list_del_init(&sk->list);
 	}
 
 	return ret;
@@ -347,24 +372,16 @@ static int write_inet_socket(context_t *ctx,
 
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_INETSK);
 
-	struct inode_struct *inode;
 	void *src, *dst;
 	int ret = -1;
 
 	if (file->dumped)
 		return 0;
 
-	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
-	if (!inode) {
-		pr_err("No inode @%li for file at @%li\n",
-		       (long)file->fi.cpt_inode, obj_pos_of(file));
-		return -1;
-	}
-
 	fill_fown(&fown, file);
 
 	ie.id		= obj_id_of(file);
-	ie.ino		= inode->ii.cpt_ino;
+	ie.ino		= obj_id_of(sk);
 	ie.family	= sk->si.cpt_family;
 	ie.proto	= sk->si.cpt_protocol;
 	ie.type		= sk->si.cpt_type;
@@ -452,24 +469,15 @@ static int write_netlink_socket(context_t *ctx,
 	FownEntry fown = FOWN_ENTRY__INIT;
 
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_NETLINKSK);
-
-	struct inode_struct *inode;
 	int ret = -1;
 
 	if (file->dumped)
 		return 0;
 
-	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
-	if (!inode) {
-		pr_err("No inode @%li for file at @%li\n",
-		       (long)file->fi.cpt_inode, obj_pos_of(file));
-		return -1;
-	}
-
 	fill_fown(&fown, file);
 
 	ne.id		= obj_id_of(file);
-	ne.ino		= inode->ii.cpt_ino;
+	ne.ino		= obj_id_of(sk);
 	ne.protocol	= sk->si.cpt_protocol;
 
 	/*
@@ -524,6 +532,74 @@ void free_sockets(context_t *ctx)
 		obj_free_to(sk);
 }
 
+static int sock_read_aux_pos(context_t *ctx, struct sock_struct *sk)
+{
+	struct sock_aux_pos *aux = &sk->aux_pos;
+	union {
+		struct cpt_object_hdr	h;
+		struct cpt_skb_image	skb;
+	} u;
+	off_t start;
+
+	for (start = obj_pos_of(sk) + sk->si.cpt_hdrlen;
+	     start < obj_pos_of(sk) + sk->si.cpt_next;
+	     start += u.h.cpt_next) {
+
+		if (read_obj_hdr(ctx->fd, &u.h, start)) {
+			pr_err("Can't read socket data header at @%li\n", (long)start);
+			return -1;
+		}
+
+		switch (u.h.cpt_object) {
+		case CPT_OBJ_SKFILTER:
+			if (!aux->off_skfilter)
+				aux->off_skfilter = start;
+			break;
+		case CPT_OBJ_SOCK_MCADDR:
+			if (!aux->off_mcaddr)
+				aux->off_mcaddr = start;
+			break;
+		case CPT_OBJ_SKB:
+			if (read_obj_cont_until(ctx->fd, &u.skb, cpt_stamp)) {
+				pr_err("Can't read skb at @%li\n", (long)start);
+				return -1;
+			}
+			switch (u.skb.cpt_queue) {
+			case CPT_SKB_RQ:
+				if (!aux->off_rqueue)
+					aux->off_rqueue = start;
+				break;
+			case CPT_SKB_WQ:
+				if (!aux->off_wqueue)
+					aux->off_wqueue = start;
+				break;
+			case CPT_SKB_OFOQ:
+				if (!aux->off_ofoqueue)
+					aux->off_ofoqueue = start;
+				break;
+			}
+			break;
+		case CPT_OBJ_OPENREQ:
+			if (!aux->off_synwait_queue)
+				aux->off_synwait_queue = start;
+			break;
+		default:
+			goto unknown_obj;
+		}
+	}
+
+	pr_debug("\t\t\toffs: @%-10li @%-10li @%-10li\n"
+		 "\t\t\t      @%-10li @%-10li @%-10li\n",
+		 (long)aux->off_skfilter, (long)aux->off_mcaddr, (long)aux->off_rqueue,
+		 (long)aux->off_wqueue, (long)aux->off_ofoqueue, (long)aux->off_synwait_queue);
+	return 0;
+
+unknown_obj:
+	pr_err("Unexpected object %d/%d at @%li\n",
+	       u.h.cpt_object, u.h.cpt_content, (long)start);
+	return -1;
+}
+
 static void show_sock_addrs(struct sock_struct *sk)
 {
 	unsigned int i;
@@ -576,13 +652,11 @@ static void show_sock_cont(context_t *ctx, struct sock_struct *sk)
 		 (long)sk->si.cpt_flags, sk->si.cpt_peer, sk->si.cpt_socketpair,
 		 sk->si.cpt_sockflags, sk->si.cpt_bound_dev_if);
 
-	pr_debug("\t\t\ttype %12s family %12s state %12s\n",
-		 sk->si.cpt_type < ARRAY_SIZE(sock_types) ?
-			 sock_types[sk->si.cpt_type] : "UNK",
-		 sk->si.cpt_family < ARRAY_SIZE(proto_families) ?
-			proto_families[sk->si.cpt_family] : "UNK",
-		 sk->si.cpt_state < ARRAY_SIZE(sock_states) ?
-			sock_states[sk->si.cpt_state] : "UNK");
+	pr_debug("\t\t\ttype %12s family %12s state %12s ino %#x\n",
+		 sk->si.cpt_type < ARRAY_SIZE(sock_types) ? sock_types[sk->si.cpt_type] : "UNK",
+		 sk->si.cpt_family < ARRAY_SIZE(proto_families) ? proto_families[sk->si.cpt_family] : "UNK",
+		 sk->si.cpt_state < ARRAY_SIZE(sock_states) ? sock_states[sk->si.cpt_state] : "UNK",
+		 obj_id_of(sk));
 
 	show_sock_addrs(sk);
 }
@@ -609,15 +683,30 @@ int read_sockets(context_t *ctx)
 
 		INIT_HLIST_NODE(&sk->hash);
 		INIT_HLIST_NODE(&sk->index_hash);
+		INIT_LIST_HEAD(&sk->list);
 		sk->dumped = false;
 
 		hash_add(sock_hash, &sk->hash, sk->si.cpt_file);
-		hash_add(sock_index_hash, &sk->index_hash, sk->si.cpt_index);
+
+		if (sk->si.cpt_index != INVALID_INDEX)
+			hash_add(sock_index_hash, &sk->index_hash, sk->si.cpt_index);
+
+		/*
+		 * Collect unix sockets into additional list, we will need
+		 * this for external unix connections handling.
+		 */
+		if (sk->si.cpt_family == PF_UNIX)
+			list_add(&sk->list, &unix_sock_list);
 
 		obj_push_hash_to(sk, CPT_OBJ_SOCKET, start);
 		start += sk->si.cpt_next;
 
 		show_sock_cont(ctx, sk);
+
+		if (sock_read_aux_pos(ctx, sk)) {
+			pr_err("Failed read socket aux positions at @%li\n", (long)start);
+			return -1;
+		}
 	}
 	pr_read_end();
 

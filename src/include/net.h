@@ -53,10 +53,39 @@ enum sock_flags {
 	SOCK_FILTER_LOCKED,
 };
 
+#define INVALID_INDEX	-1
+#define USK_EXTERN	(1 << 0)
+
+struct sock_aux_pos {
+	/*
+	 * Attributes.
+	 */
+	off_t				off_skfilter;
+	off_t				off_mcaddr;
+
+	/*
+	 * Read queue.
+	 */
+	off_t				off_rqueue;
+
+	/*
+	 * Write queue.
+	 */
+	off_t				off_wqueue;
+	off_t				off_ofoqueue;
+
+	/*
+	 * Synwaits.
+	 */
+	off_t				off_synwait_queue;
+};
+
 struct sock_struct {
 	struct hlist_node		hash;
 	struct hlist_node		index_hash;
+	struct list_head		list;
 	bool				dumped;
+	struct sock_aux_pos		aux_pos;
 
 	struct cpt_sock_image		si;
 };
@@ -78,6 +107,7 @@ struct ifaddr_struct {
 extern int read_sockets(context_t *ctx);
 extern void free_sockets(context_t *ctx);
 extern struct sock_struct *sk_lookup_file(u64 cpt_file);
+extern int write_extern_unix(context_t *ctx);
 
 extern int read_netdevs(context_t *ctx);
 extern int write_netdevs(context_t *ctx);
