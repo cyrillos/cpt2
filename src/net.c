@@ -42,6 +42,38 @@
 static const u32 IFADDR_DUMP_MAGIC = 0x47361222;
 static const u32 ROUTE_DUMP_MAGIC = 0x45311224;
 
+static const char *proto_families[] = {
+	[PF_UNIX]		= "UNIX",
+	[PF_INET]		= "INET",
+	[PF_INET6]		= "INET6",
+	[PF_NETLINK]		= "NETLINK",
+	[PF_PACKET]		= "PACKET",
+};
+
+static const char *sock_states[] = {
+	[TCP_ESTABLISHED]	= "ESTABLISHED",
+	[TCP_SYN_SENT]		= "SYN-SENT",
+	[TCP_SYN_RECV]		= "SYN-RECV",
+	[TCP_FIN_WAIT1]		= "FIN-WAIT1",
+	[TCP_FIN_WAIT2]		= "FIN-WAIT2",
+	[TCP_TIME_WAIT]		= "TIME-WAIT",
+	[TCP_CLOSE]		= "CLOSE",
+	[TCP_CLOSE_WAIT]	= "CLOSE-WAIT",
+	[TCP_LAST_ACK]		= "LAST-ACK",
+	[TCP_LISTEN]		= "LISTEN",
+	[TCP_CLOSING]		= "CLOSING",
+};
+
+static const char *sock_types[] = {
+	[SOCK_STREAM]		= "STREAM",
+	[SOCK_DGRAM]		= "DGRAM",
+	[SOCK_RAW]		= "RAW",
+	[SOCK_RDM]		= "RDM",
+	[SOCK_SEQPACKET]	= "SEQPACKET",
+	[SOCK_DCCP]		= "DCCP",
+	[SOCK_PACKET]		= "PACKET",
+};
+
 #define NET_HASH_BITS		10
 static DEFINE_HASHTABLE(sock_hash, NET_HASH_BITS);
 static DEFINE_HASHTABLE(sock_index_hash, NET_HASH_BITS);
@@ -543,6 +575,15 @@ static void show_sock_cont(context_t *ctx, struct sock_struct *sk)
 		 sk->si.cpt_reuse, sk->si.cpt_zapped, sk->si.cpt_shutdown, sk->si.cpt_protocol,
 		 (long)sk->si.cpt_flags, sk->si.cpt_peer, sk->si.cpt_socketpair,
 		 sk->si.cpt_sockflags, sk->si.cpt_bound_dev_if);
+
+	pr_debug("\t\t\ttype %12s family %12s state %12s\n",
+		 sk->si.cpt_type < ARRAY_SIZE(sock_types) ?
+			 sock_types[sk->si.cpt_type] : "UNK",
+		 sk->si.cpt_family < ARRAY_SIZE(proto_families) ?
+			proto_families[sk->si.cpt_family] : "UNK",
+		 sk->si.cpt_state < ARRAY_SIZE(sock_states) ?
+			sock_states[sk->si.cpt_state] : "UNK");
+
 	show_sock_addrs(sk);
 }
 
@@ -852,10 +893,13 @@ int write_ifaddr(context_t *ctx)
 
 static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
 {
-	pr_debug("\t@%-10li index %#8x family %#1x masklen %#1x "
+	BUG_ON(ifa->ii.cpt_family >= ARRAY_SIZE(proto_families));
+
+	pr_debug("\t@%-10li index %#8x family %8s masklen %#1x "
 		 "flags %#1x scope %#1x -> %s\n", obj_pos_of(ifa),
-		 ifa->ii.cpt_index, (int)ifa->ii.cpt_family, (int)ifa->ii.cpt_masklen,
-		 (int)ifa->ii.cpt_flags, (int)ifa->ii.cpt_scope, (char *)ifa->ii.cpt_label);
+		 ifa->ii.cpt_index, proto_families[ifa->ii.cpt_family],
+		 (int)ifa->ii.cpt_masklen, (int)ifa->ii.cpt_flags,
+		 (int)ifa->ii.cpt_scope, (char *)ifa->ii.cpt_label);
 }
 
 int read_ifaddr(context_t *ctx)
