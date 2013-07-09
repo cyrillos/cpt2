@@ -11,6 +11,7 @@
 #include "context.h"
 #include "xmalloc.h"
 #include "timers.h"
+#include "socket.h"
 #include "files.h"
 #include "epoll.h"
 #include "read.h"

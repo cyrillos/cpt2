@@ -13,6 +13,7 @@
 #include "compiler.h"
 #include "magicfs.h"
 #include "xmalloc.h"
+#include "socket.h"
 #include "files.h"
 #include "image.h"
 #include "epoll.h"

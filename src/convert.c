@@ -10,6 +10,7 @@
 #include "convert.h"
 #include "xmalloc.h"
 #include "string.h"
+#include "socket.h"
 #include "image.h"
 #include "read.h"
 #include "task.h"
