@@ -12,6 +12,7 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_addr.h>
+#include <linux/filter.h>
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -133,6 +134,58 @@ static bool can_dump_unix_sk(const struct sock_struct *sk)
 	return true;
 }
 
+/* Caller must always xfree skopts->so_filter */
+static int fill_socket_filter(context_t *ctx, const struct sock_struct *sk, SkOptsEntry *skopts)
+{
+	const struct sock_aux_pos *aux = &sk->aux_pos;
+	struct sock_filter *filter;
+	struct cpt_obj_bits v;
+	unsigned int len, i;
+
+	if (!aux->off_skfilter)
+		return 0;
+
+	if (read_obj_cpt(ctx->fd, CPT_OBJ_SKFILTER, &v, aux->off_skfilter)) {
+		pr_err("Failed reading socket filter at @%li\n", aux->off_skfilter);
+		return -1;
+	}
+
+	len = v.cpt_size / sizeof(struct sock_filter);
+	if (len) {
+		/*
+		 * We will need to encode filter bytestream
+		 * so allocate enough memory for both read and
+		 * encode buffers, the caller is to free this
+		 * slab later.
+		 */
+		skopts->so_filter = xmalloc(len * sizeof(*skopts->so_filter) + v.cpt_size);
+		if (!skopts->so_filter)
+			goto err;
+		filter = (void *)((char *)skopts->so_filter + len * sizeof(*skopts->so_filter));
+		skopts->n_so_filter = len;
+
+		if (read_data(ctx->fd, filter, v.cpt_size, false)) {
+			pr_err("Failed reading socket filter at @%li\n", aux->off_skfilter);
+			goto err;
+		}
+
+		for (i = 0; i < v.cpt_size; i++) {
+			skopts->so_filter[i] =
+				((u64)filter[i].code	<< 48) |
+				((u64)filter[i].jt	<< 40) |
+				((u64)filter[i].jf	<< 32) |
+				((u64)filter[i].k	<<  0);
+		}
+	}
+
+	return 0;
+
+err:
+	xfree(skopts->so_filter);
+	skopts->n_so_filter = 0;
+	return -1;
+}
+
 static int fill_socket_opts(context_t *ctx, const struct sock_struct *sk, SkOptsEntry *skopts)
 {
 	sk_opts_entry__init(skopts);
@@ -191,7 +244,7 @@ static int fill_socket_opts(context_t *ctx, const struct sock_struct *sk, SkOpts
 		skopts->so_bound_dev = (char *)dev->ni.cpt_name;
 	}
 
-	return 0;
+	return fill_socket_filter(ctx, sk, skopts);
 }
 
 int write_extern_unix(context_t *ctx)
@@ -326,6 +379,7 @@ static int write_unix_socket(context_t *ctx, struct file_struct *file, struct so
 		list_del_init(&sk->list);
 	}
 
+	xfree(skopts.so_filter);
 	return ret;
 }
 
