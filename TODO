@@ -3,7 +3,7 @@
 - stubs for fanotify, socket queues, remap files, namespaces files (ie /proc/ns:[])
 - sockets filters
 - netdevice, only lo supported
-- no timers (not yet implemented in criu)
+- no posix timers (not yet implemented in criu)
 - no locked termios in cpt image
 - iptables data
 - routing need to be revisited
