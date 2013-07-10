@@ -264,8 +264,10 @@ int write_extern_unix(context_t *ctx)
 			return -1;
 		}
 
-		ue.name.len		= (size_t)sk->si.cpt_laddrlen - 2;
-		ue.name.data		= (void *)&((char *)sk->si.cpt_laddr)[2];
+		if (sk->si.cpt_laddrlen > 2) {
+			ue.name.len	= (size_t)sk->si.cpt_laddrlen - 2;
+			ue.name.data	= ((void *)sk->si.cpt_laddr) + 2;
+		}
 
 		ue.id			= obj_id_of(sk);
 		ue.ino			= obj_id_of(sk);
@@ -362,8 +364,10 @@ static int write_unix_socket(context_t *ctx, struct file_struct *file, struct so
 
 	fill_fown(&fown, file);
 
-	ue.name.len		= (size_t)sk->si.cpt_laddrlen - 2;
-	ue.name.data		= (void *)&((char *)sk->si.cpt_laddr)[2];
+	if (sk->si.cpt_laddrlen > 2) {
+		ue.name.len	= (size_t)sk->si.cpt_laddrlen - 2;
+		ue.name.data	= ((void *)sk->si.cpt_laddr) + 2;
+	}
 
 	if (fill_unix_perms(ctx, file, sk, &ue, &perms)) {
 		pr_err("Can't fill permissions on socket path at @%li\n", obj_pos_of(file));
@@ -657,44 +661,32 @@ unknown_obj:
 	return -1;
 }
 
+static void show_sock_addr(const char *prefix, int family, char *src, size_t len)
+{
+	if (len) {
+		unsigned int i;
+
+		pr_debug("\t\t\t%10s (%u)\n\t\t\t", prefix, (unsigned int)len);
+
+		for (i = 0; i < len; i++) {
+			pr_debug("0x%02x:", (int)src[i]);
+			if (!((i + 1) % 8))
+				pr_debug("\n\t\t\t");
+		}
+
+		if (family == PF_UNIX && len > 2) {
+			pr_debug("\n\t\t\t --> ");
+			for (i = 0; i < len; i++)
+				pr_debug("%c", isprint(src[i]) ? src[i] : '.');
+		}
+		pr_debug("\n");
+	}
+}
+
 static void show_sock_addrs(struct sock_struct *sk)
 {
-	unsigned int i;
-	char *c;
-
-	if (sk->si.cpt_laddrlen) {
-		pr_debug("\t\t\tlocal (%d)\n\t\t\t", sk->si.cpt_laddrlen);
-		c = (char *)sk->si.cpt_laddr;
-		for (i = 0; i < sk->si.cpt_laddrlen; i++, c++) {
-			pr_debug("%2x:", (int)*c);
-			if (i && (i % 8) == 0)
-				pr_debug("\n\t\t\t");
-		}
-		if (sk->si.cpt_family == PF_UNIX) {
-			pr_debug("\n\t\t\t --> ");
-			c = (char *)sk->si.cpt_laddr;
-			for (i = 0; i < sk->si.cpt_laddrlen; i++, c++)
-				pr_debug("%c", isascii(*c) ? *c : ' ');
-		}
-		pr_debug("\n");
-	}
-
-	if (sk->si.cpt_raddrlen) {
-		pr_debug("\t\t\tremote (%d)\n\t\t\t", sk->si.cpt_raddrlen);
-		c = (char *)sk->si.cpt_raddr;
-		for (i = 0; i < sk->si.cpt_raddrlen; i++, c++) {
-			pr_debug("%2x:", (int)*c);
-			if (i && (i % 8) == 0)
-				pr_debug("\n\t\t\t");
-		}
-		if (sk->si.cpt_family == PF_UNIX) {
-			pr_debug("\n\t\t\t --> ");
-			c = (char *)sk->si.cpt_raddr;
-			for (i = 0; i < sk->si.cpt_raddrlen; i++, c++)
-				pr_debug("%c", isascii(*c) ? *c : ' ');
-		}
-		pr_debug("\n");
-	}
+	show_sock_addr("local ", sk->si.cpt_family, (char *)sk->si.cpt_laddr, sk->si.cpt_laddrlen);
+	show_sock_addr("remote", sk->si.cpt_family, (char *)sk->si.cpt_raddr, sk->si.cpt_raddrlen);
 }
 
 static void show_sock_cont(context_t *ctx, struct sock_struct *sk)
@@ -716,6 +708,29 @@ static void show_sock_cont(context_t *ctx, struct sock_struct *sk)
 		 obj_id_of(sk));
 
 	show_sock_addrs(sk);
+}
+
+static void fix_unix_name(char *addr, unsigned int addr_size, unsigned int *len)
+{
+	/*
+	 * This is somehow unpleasant, but OpenVZ keeps unix 'path' names
+	 * without ending zero. So we need to alterate them to be compatible
+	 * with format used in criu.
+	 */
+	if (*len > 2 && *len < (addr_size + 1)) {
+		if (addr[2] != '\0' && addr[*len - 1] != '\0') {
+			addr[(*len)++] = '\0';
+		}
+	}
+}
+
+static void fix_unix_names(struct sock_struct *sk)
+{
+	if (sk->si.cpt_family != PF_UNIX)
+		return;
+
+	fix_unix_name((char *)sk->si.cpt_laddr, sizeof(sk->si.cpt_laddr), &sk->si.cpt_laddrlen);
+	fix_unix_name((char *)sk->si.cpt_raddr, sizeof(sk->si.cpt_raddr), &sk->si.cpt_raddrlen);
 }
 
 int read_sockets(context_t *ctx)
@@ -758,12 +773,14 @@ int read_sockets(context_t *ctx)
 		obj_push_hash_to(sk, CPT_OBJ_SOCKET, start);
 		start += sk->si.cpt_next;
 
+		fix_unix_names(sk);
 		show_sock_cont(ctx, sk);
 
 		if (sock_read_aux_pos(ctx, sk)) {
 			pr_err("Failed read socket aux positions at @%li\n", (long)start);
 			return -1;
 		}
+
 	}
 	pr_read_end();
 
