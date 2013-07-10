@@ -23,6 +23,7 @@
 #include "hashtable.h"
 #include "xmalloc.h"
 #include "socket.h"
+#include "string.h"
 #include "image.h"
 #include "mslab.h"
 #include "read.h"
@@ -282,6 +283,33 @@ int write_extern_unix(context_t *ctx)
 	return 0;
 }
 
+static int fill_unix_perms(context_t *ctx, struct file_struct *file,
+			   struct sock_struct *sk, UnixSkEntry *ue,
+			   FilePermsEntry *perms)
+{
+	/*
+	 * FIXME Need to deal with deleted sockets, they have
+	 * cpt_sockflags |= CPT_SOCK_DELETED
+	 */
+
+	if (sk->si.cpt_sockflags & CPT_SOCK_DELETED) {
+		pr_err("Deleted unix sockets are not yet handled\n");
+		return -1;
+	}
+
+	if (sk->si.cpt_laddrlen < 2)
+		return 0;
+
+	ue->file_perms = perms;
+	perms->mode = sk->si.cpt_i_mode;
+
+	/*
+	 * FIXME How to fetch uid/gid ?
+	 */
+
+	return 0;
+}
+
 static int write_unix_socket(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
 {
 	FilePermsEntry perms = FILE_PERMS_ENTRY__INIT;
@@ -337,11 +365,9 @@ static int write_unix_socket(context_t *ctx, struct file_struct *file, struct so
 	ue.name.len		= (size_t)sk->si.cpt_laddrlen - 2;
 	ue.name.data		= (void *)&((char *)sk->si.cpt_laddr)[2];
 
-	if (sk->si.cpt_laddrlen) {
-		ue.file_perms	= &perms;
-		perms.mode	= sk->si.cpt_i_mode;
-		perms.uid	= sk->si.cpt_peer_uid;
-		perms.gid	= sk->si.cpt_peer_gid;
+	if (fill_unix_perms(ctx, file, sk, &ue, &perms)) {
+		pr_err("Can't fill permissions on socket path at @%li\n", obj_pos_of(file));
+		return -1;
 	}
 
 	ue.id			= obj_id_of(file);
