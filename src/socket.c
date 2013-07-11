@@ -35,6 +35,7 @@
 #include "protobuf.h"
 #include "protobuf/sk-unix.pb-c.h"
 #include "protobuf/sk-inet.pb-c.h"
+#include "protobuf/sk-packet.pb-c.h"
 #include "protobuf/sk-netlink.pb-c.h"
 
 static const char *proto_families[] = {
@@ -133,6 +134,96 @@ static bool can_dump_unix_sk(const struct sock_struct *sk)
 	}
 
 	return true;
+}
+
+static int __write_skb_queue(context_t *ctx, struct file_struct *file,
+			     struct sock_struct *sk, int fd, off_t start)
+{
+	SkPacketEntry pe = SK_PACKET_ENTRY__INIT;
+
+	union {
+		struct cpt_object_hdr	h;
+		struct cpt_skb_image	skb;
+		struct cpt_obj_bits	bits;
+		struct cpt_fd_image	fdi;
+	} u;
+
+	if (read_obj_hdr(ctx->fd, &u.h, start)) {
+		pr_err("Failed reading skb header at @%li\n", start);
+		return -1;
+	}
+
+	if (u.h.cpt_object != CPT_OBJ_SKB) {
+		pr_err("Unexpected object %s at @%li\n",
+		       obj_name(u.h.cpt_object), start);
+		return -1;
+	}
+
+	/*
+	 * No payload -- valid case.
+	 */
+	if (u.h.cpt_next <= u.h.cpt_hdrlen)
+		return 0;
+
+	start += u.h.cpt_hdrlen;
+	if (read_obj_hdr(ctx->fd, &u.h, start)) {
+		pr_err("Failed reading header at @%li\n", start);
+		return -1;
+	}
+
+	/*
+	 * It might be 2 kind of objects here
+	 * - CPT_OBJ_BITS for skb data
+	 * - in case of unix sockets there might be
+	 *   a set of file descriptors, which we
+	 *   don't support in criu
+	 */
+
+	if (u.h.cpt_object == CPT_OBJ_BITS) {
+		if (read_obj_cont(ctx->fd, &u.bits)) {
+			pr_err("Failed reading bits at @%li\n", start);
+			return -1;
+		}
+
+		pe.id_for = obj_id_of(file);
+		pe.length = u.bits.cpt_size;
+
+		if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
+			pr_err("Failed writting bits at @%li\n", start);
+			return -1;
+		}
+
+		if (splice_data(ctx->fd, fd, u.bits.cpt_size)) {
+			pr_err("Failed splicing bits at @%li\n", start);
+			return -1;
+		}
+
+		/*
+		 * Prepare to read unix fd if present.
+		 */
+		start += u.bits.cpt_next;
+		if (read_obj_hdr(ctx->fd, &u.h, start)) {
+			pr_err("Failed reading header at @%li\n", start);
+			return -1;
+		}
+	}
+
+	if (u.h.cpt_object == CPT_OBJ_FILEDESC) {
+		pr_err("Found SCM file descriptors, can't proceed at @%li\n", start);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int write_read_queue(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
+{
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_SK_QUEUES);
+
+	if (sk->aux_pos.off_rqueue)
+		return __write_skb_queue(ctx, file, sk, fd, sk->aux_pos.off_rqueue);
+
+	return 0;
 }
 
 /* Caller must always xfree skopts->so_filter */
@@ -408,6 +499,8 @@ static int write_unix_socket(context_t *ctx, struct file_struct *file, struct so
 		file->dumped = true;
 		sk->dumped = true;
 		list_del_init(&sk->list);
+
+		ret = write_read_queue(ctx, file, sk);
 	}
 
 	xfree(skopts.so_filter);

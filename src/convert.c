@@ -88,7 +88,6 @@ static int write_stubs(context_t *ctx)
 	gen_stub(FANOTIFY);
 	gen_stub(FANOTIFY_MARK);
 	gen_stub(PACKETSK);
-	gen_stub(SK_QUEUES);
 	gen_stub(NS_FILES);
 #undef gen_stub
 
