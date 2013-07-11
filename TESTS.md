@@ -81,7 +81,6 @@ sh test/zdtm-cpt2.sh start static/pipe00 static/pipe01 static/cwd00 static/env00
 In progress
 -----------
 
-static/sockets00
 static/sockets01
 - static/sock_opts00
 - static/sock_opts01
