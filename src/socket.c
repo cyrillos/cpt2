@@ -289,6 +289,7 @@ static int fill_unix_perms(context_t *ctx, struct file_struct *file,
 			   struct sock_struct *sk, UnixSkEntry *ue,
 			   FilePermsEntry *perms)
 {
+#if 0
 	/*
 	 * FIXME Need to deal with deleted sockets, they have
 	 * cpt_sockflags |= CPT_SOCK_DELETED
@@ -308,7 +309,7 @@ static int fill_unix_perms(context_t *ctx, struct file_struct *file,
 	/*
 	 * FIXME How to fetch uid/gid ?
 	 */
-
+#endif
 	return 0;
 }
 
