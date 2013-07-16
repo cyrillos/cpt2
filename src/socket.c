@@ -380,7 +380,6 @@ static int fill_unix_perms(context_t *ctx, struct file_struct *file,
 			   struct sock_struct *sk, UnixSkEntry *ue,
 			   FilePermsEntry *perms)
 {
-#if 0
 	/*
 	 * FIXME Need to deal with deleted sockets, they have
 	 * cpt_sockflags |= CPT_SOCK_DELETED
@@ -394,13 +393,15 @@ static int fill_unix_perms(context_t *ctx, struct file_struct *file,
 	if (sk->si.cpt_laddrlen < 2)
 		return 0;
 
-	ue->file_perms = perms;
-	perms->mode = sk->si.cpt_i_mode;
-
 	/*
-	 * FIXME How to fetch uid/gid ?
+	 * FIXME For some reason OpenVZ saves only mode
+	 * for dentry which represents socket path. So
+	 * UID/GID is missed and it seems I've to find
+	 * a path here manually and call for stat.
 	 */
-#endif
+	ue->file_perms = perms;
+	perms->mode	= sk->si.cpt_i_mode;
+
 	return 0;
 }
 
