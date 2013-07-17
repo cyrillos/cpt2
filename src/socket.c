@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -13,6 +14,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/if_addr.h>
 #include <linux/filter.h>
+#include <linux/sockios.h>
 
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -37,6 +39,7 @@
 #include "protobuf/sk-inet.pb-c.h"
 #include "protobuf/sk-packet.pb-c.h"
 #include "protobuf/sk-netlink.pb-c.h"
+#include "protobuf/tcp-stream.pb-c.h"
 
 static const char *proto_families[] = {
 	[PF_UNIX]		= "UNIX",
@@ -179,15 +182,15 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 		if (u.skb.cpt_owner != -1) {
 			switch (type) {
 			case CPT_SKB_RQ:
-				if (u.skb.cpt_owner != sk->si.cpt_peer) {
-					pr_err("Read queue owner mismatch %d %d at @%li\n",
+				if (sk->si.cpt_peer != -1 && u.skb.cpt_owner != sk->si.cpt_peer) {
+					pr_err("Read queue owner mismatch %x %x at @%li\n",
 					       u.skb.cpt_owner, sk->si.cpt_peer, (long)start);
 					return -1;
 				}
 				break;
 			case CPT_SKB_WQ:
-				if (u.skb.cpt_owner != sk->si.cpt_index) {
-					pr_err("Write queue owner mismatch %d %d at @%li\n",
+				if (sk->si.cpt_index != -1 && u.skb.cpt_owner != sk->si.cpt_index) {
+					pr_err("Write queue owner mismatch %x %x at @%li\n",
 					       u.skb.cpt_owner, sk->si.cpt_index, (long)start);
 					return -1;
 				}
@@ -537,16 +540,143 @@ static int write_unix_socket(context_t *ctx, struct file_struct *file, struct so
 	return ret;
 }
 
+static int tcp_emulate_ioctl(struct sock_struct *sk, int cmd)
+{
+	int answ;
+
+	switch (cmd) {
+	case SIOCINQ:
+		if (sk->si.cpt_state == TCP_LISTEN)
+			return -EINVAL;
+
+		if ((1 << sk->si.cpt_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV)) {
+			answ = 0;
+		} else if (sock_flag(sk, SOCK_URGINLINE)			||
+			   !sk->si.cpt_urg_data					||
+			   before(sk->si.cpt_urg_seq, sk->si.cpt_copied_seq)	||
+			   !before(sk->si.cpt_urg_seq, sk->si.cpt_rcv_nxt)) {
+
+			answ = sk->si.cpt_rcv_nxt - sk->si.cpt_copied_seq;
+
+			/* Subtract 1, if FIN was received */
+			if (answ && sock_flag(sk, SOCK_DONE))
+				answ--;
+		} else
+			answ = sk->si.cpt_urg_seq - sk->si.cpt_copied_seq;
+		break;
+	case SIOCOUTQ:
+		if (sk->si.cpt_state == TCP_LISTEN)
+			return -EINVAL;
+
+		if ((1 << sk->si.cpt_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV))
+			answ = 0;
+		else
+			answ = sk->si.cpt_write_seq - sk->si.cpt_snd_una;
+		break;
+		break;
+	default:
+		pr_err("Unknown ioctl code %d\n", cmd);
+		answ = -EINVAL;
+		break;
+	}
+
+	return answ;
+}
+
 static int write_tcp(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
 {
-	if (sk->si.cpt_state != TCP_ESTABLISHED)
-		return 0;
+	int fd = open_image(ctx, CR_FD_TCP_STREAM, O_DUMP, obj_id_of(sk));
+	TcpStreamEntry tse = TCP_STREAM_ENTRY__INIT;
+	int ret = -1;
+
+	if (fd < 0) {
+		pr_err("Can't open tcp image\n");
+		return -1;
+	}
 
 	/*
-	 * FIXME convert queue
+	 * Queues parameters.
 	 */
+	tse.inq_len	= tcp_emulate_ioctl(sk, SIOCINQ);
+	tse.outq_len	= tcp_emulate_ioctl(sk, SIOCOUTQ);
 
-	return 0;
+	if ((int)tse.inq_len < 0 || (int)tse.outq_len < 0) {
+		pr_err("Failed fetch queue length %d %d on socket @%li\n",
+		       (int)tse.inq_len, (int)tse.outq_len, obj_pos_of(sk));
+		return -1;
+	}
+
+	tse.inq_seq	= sk->si.cpt_rcv_nxt;
+	tse.outq_seq	= sk->si.cpt_write_seq;
+
+	/*
+	 * Options.
+	 */
+	tse.mss_clamp	= sk->si.cpt_mss_clamp;
+
+	if (sk->si.cpt_tstamp_ok)
+		tse.opt_mask |= TCPI_OPT_TIMESTAMPS;
+	if (sk->si.cpt_sack_ok)
+		tse.opt_mask |= TCPI_OPT_SACK;
+	if (sk->si.cpt_wscale_ok)
+		tse.opt_mask |= TCPI_OPT_WSCALE;
+	if (sk->si.cpt_ecn_flags & TCP_ECN_OK)
+		tse.opt_mask |= TCPI_OPT_ECN;
+	if (sk->si.cpt_ecn_flags & TCP_ECN_SEEN)
+		tse.opt_mask |= TCPI_OPT_ECN_SEEN;
+
+	if (tse.opt_mask & TCPI_OPT_WSCALE) {
+		tse.snd_wscale		= sk->si.cpt_snd_wscale;
+		tse.rcv_wscale		= sk->si.cpt_rcv_wscale;
+		tse.has_rcv_wscale	= true;
+	}
+
+	/*
+	 * FIXME Incomplete!!!
+	 */
+	if (tse.opt_mask & TCPI_OPT_TIMESTAMPS) {
+		tse.timestamp		= (u32)ctx->h.cpt_start_jiffies64;
+		tse.has_timestamp	= true;
+	}
+
+	if (pb_write_one(fd, &tse, PB_TCP_STREAM))
+		goto err;
+
+	/*
+	 * Queues data.
+	 */
+	if (tse.inq_len) {
+		if (!sk->aux_pos.off_rqueue) {
+			pr_err("Image read queue length %u corruption on socket @%li\n",
+			       tse.inq_len, obj_pos_of(sk));
+			goto err;
+		}
+
+		ret = __write_skb_queue(ctx, file, sk, fd, CPT_SKB_RQ,
+					sk->aux_pos.off_rqueue,
+					obj_pos_of(sk) + sk->si.cpt_next);
+		if (ret)
+			goto err;
+	}
+
+	if (tse.outq_len) {
+		if (!sk->aux_pos.off_wqueue) {
+			pr_err("Image write queue length %u corruption on socket @%li\n",
+			       tse.outq_len, obj_pos_of(sk));
+			goto err;
+		}
+
+		ret = __write_skb_queue(ctx, file, sk, fd, CPT_SKB_WQ,
+					sk->aux_pos.off_wqueue,
+					obj_pos_of(sk) + sk->si.cpt_next);
+		if (ret)
+			goto err;
+	}
+
+	ret = 0;
+err:
+	close_safe(&fd);
+	return ret;
 }
 
 static int write_inet_socket(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
@@ -633,7 +763,8 @@ static int write_inet_socket(context_t *ctx, struct file_struct *file, struct so
 
 	ret = pb_write_one(fd, &ie, PB_INETSK);
 	if (!ret) {
-		if (sk->si.cpt_protocol == IPPROTO_TCP)
+		if (sk->si.cpt_protocol == IPPROTO_TCP &&
+		    sk->si.cpt_state == TCP_ESTABLISHED)
 			ret = write_tcp(ctx, file, sk);
 		if (!ret)
 			file->dumped = true;

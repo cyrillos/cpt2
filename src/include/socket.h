@@ -51,6 +51,32 @@ enum sock_flags {
 	SOCK_FILTER_LOCKED,
 };
 
+enum {
+	TCPF_ESTABLISHED	= (1 <<  1),
+	TCPF_SYN_SENT		= (1 <<  2),
+	TCPF_SYN_RECV		= (1 <<  3),
+	TCPF_FIN_WAIT1		= (1 <<  4),
+	TCPF_FIN_WAIT2		= (1 <<  5),
+	TCPF_TIME_WAIT		= (1 <<  6),
+	TCPF_CLOSE		= (1 <<  7),
+	TCPF_CLOSE_WAIT		= (1 <<  8),
+	TCPF_LAST_ACK		= (1 <<  9),
+	TCPF_LISTEN		= (1 << 10),
+	TCPF_CLOSING		= (1 << 11)
+};
+
+#define	TCP_ECN_OK		1
+#define	TCP_ECN_QUEUE_CWR	2
+#define	TCP_ECN_DEMAND_CWR	4
+#define	TCP_ECN_SEEN		8
+
+#define TCPI_OPT_TIMESTAMPS	 1
+#define TCPI_OPT_SACK		 2
+#define TCPI_OPT_WSCALE		 4
+#define TCPI_OPT_ECN		 8 /* ECN was negociated at TCP session init */
+#define TCPI_OPT_ECN_SEEN	16 /* we received at least one packet with ECT */
+#define TCPI_OPT_SYN_DATA	32 /* SYN-ACK acked data in SYN sent or rcvd */
+
 #define INVALID_INDEX	-1
 #define USK_EXTERN	(1 << 0)
 
@@ -95,5 +121,20 @@ extern void free_sockets(context_t *ctx);
 extern struct sock_struct *sk_lookup_file(u64 cpt_file);
 extern int write_socket(context_t *ctx, struct file_struct *file);
 extern int write_extern_unix(context_t *ctx);
+
+static inline bool sock_flag(const struct sock_struct *sk, enum sock_flags flag)
+{
+	return (sk->si.cpt_flags & (1 << flag));
+}
+
+static inline bool before(u32 seq1, u32 seq2)
+{
+        return (s32)(seq1 - seq2) < 0;
+}
+
+static inline bool after(u32 seq2, u32 seq1)
+{
+	return before(seq1, seq2);
+}
 
 #endif /* __CPT2_SOCKET_H__ */
