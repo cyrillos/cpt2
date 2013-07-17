@@ -58,6 +58,9 @@ extern int read_obj(int fd, int objtype, void *p, size_t size, off_t pos);
 #define read_obj_hdr(fd, p, pos)					\
 	read_obj(fd, OBJ_ANY, p, sizeof(struct cpt_object_hdr), pos)
 
+#define read_obj_type_hdr(fd, objtype, p, pos)				\
+	read_obj(fd, objtype, p, sizeof(struct cpt_object_hdr), pos)
+
 #define read_obj_cpt(fd, objtype, p, pos)				\
 	read_obj(fd, objtype, p, sizeof(*(p)), pos)
 
