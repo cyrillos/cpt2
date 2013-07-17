@@ -697,6 +697,8 @@ static int sock_read_aux_pos(context_t *ctx, struct sock_struct *sk)
 	} u;
 	off_t start;
 
+	unsigned int queue_owners[3] = { -1, -1, -1};
+
 	for (start = obj_pos_of(sk) + sk->si.cpt_hdrlen;
 	     start < obj_pos_of(sk) + sk->si.cpt_next;
 	     start += u.h.cpt_next) {
@@ -722,18 +724,25 @@ static int sock_read_aux_pos(context_t *ctx, struct sock_struct *sk)
 			}
 			switch (u.skb.cpt_queue) {
 			case CPT_SKB_RQ:
-				if (!aux->off_rqueue)
+				if (!aux->off_rqueue) {
 					aux->off_rqueue = start;
+					queue_owners[0] = u.skb.cpt_owner;
+				}
 				break;
 			case CPT_SKB_WQ:
-				if (!aux->off_wqueue)
+				if (!aux->off_wqueue) {
 					aux->off_wqueue = start;
+					queue_owners[1] = u.skb.cpt_owner;
+				}
 				break;
 			case CPT_SKB_OFOQ:
-				if (!aux->off_ofoqueue)
+				if (!aux->off_ofoqueue) {
 					aux->off_ofoqueue = start;
+					queue_owners[2] = u.skb.cpt_owner;
+				}
 				break;
 			}
+
 			break;
 		case CPT_OBJ_OPENREQ:
 			if (!aux->off_synwait_queue)
@@ -745,9 +754,11 @@ static int sock_read_aux_pos(context_t *ctx, struct sock_struct *sk)
 	}
 
 	pr_debug("\t\t\toffs: @%-10li @%-10li @%-10li\n"
-		 "\t\t\t      @%-10li @%-10li @%-10li\n",
+		 "\t\t\t      @%-10li @%-10li @%-10li\n"
+		 "\t\t\tqown: %d %d %d\n",
 		 (long)aux->off_skfilter, (long)aux->off_mcaddr, (long)aux->off_rqueue,
-		 (long)aux->off_wqueue, (long)aux->off_ofoqueue, (long)aux->off_synwait_queue);
+		 (long)aux->off_wqueue, (long)aux->off_ofoqueue, (long)aux->off_synwait_queue,
+		 queue_owners[0], queue_owners[1], queue_owners[2]);
 	return 0;
 
 unknown_obj:
