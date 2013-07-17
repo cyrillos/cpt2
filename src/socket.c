@@ -137,7 +137,8 @@ static bool can_dump_unix_sk(const struct sock_struct *sk)
 }
 
 static int __write_skb_queue(context_t *ctx, struct file_struct *file,
-			     struct sock_struct *sk, int fd, off_t start)
+			     struct sock_struct *sk, int fd,
+			     unsigned int type, off_t start, off_t end)
 {
 	SkPacketEntry pe = SK_PACKET_ENTRY__INIT;
 
@@ -147,70 +148,97 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 		struct cpt_obj_bits	bits;
 		struct cpt_fd_image	fdi;
 	} u;
+	off_t next, at;
 
-	if (read_obj_hdr(ctx->fd, &u.h, start)) {
-		pr_err("Failed reading skb header at @%li\n", start);
-		return -1;
-	}
 
-	if (u.h.cpt_object != CPT_OBJ_SKB) {
-		pr_err("Unexpected object %s at @%li\n",
-		       obj_name(u.h.cpt_object), start);
-		return -1;
-	}
-
-	/*
-	 * No payload -- valid case.
-	 */
-	if (u.h.cpt_next <= u.h.cpt_hdrlen)
-		return 0;
-
-	start += u.h.cpt_hdrlen;
-	if (read_obj_hdr(ctx->fd, &u.h, start)) {
-		pr_err("Failed reading header at @%li\n", start);
-		return -1;
-	}
-
-	/*
-	 * It might be 2 kind of objects here
-	 * - CPT_OBJ_BITS for skb data
-	 * - in case of unix sockets there might be
-	 *   a set of file descriptors, which we
-	 *   don't support in criu
-	 */
-
-	if (u.h.cpt_object == CPT_OBJ_BITS) {
-		if (read_obj_cont(ctx->fd, &u.bits)) {
-			pr_err("Failed reading bits at @%li\n", start);
+	for (; start < end; start += next) {
+		if (read_obj_type_hdr(ctx->fd, CPT_OBJ_SKB, &u.h, start)) {
+			pr_err("Failed reading skb header at @%li\n", start);
 			return -1;
 		}
-
-		pe.id_for = obj_id_of(file);
-		pe.length = u.bits.cpt_size;
-
-		if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
-			pr_err("Failed writting bits at @%li\n", start);
+		if (read_obj_cont_until(ctx->fd, &u.skb, cpt_stamp)) {
+			pr_err("Can't read skb at @%li\n", (long)start);
 			return -1;
 		}
+		next = u.h.cpt_next;
 
-		if (splice_data(ctx->fd, fd, u.bits.cpt_size)) {
-			pr_err("Failed splicing bits at @%li\n", start);
+		if (next <= u.h.cpt_hdrlen)
+			continue;
+
+		/*
+		 * We know that queues with same type are written
+		 * sequently, thus exit out early once meet one
+		 * different.
+		 */
+		if (u.skb.cpt_queue != type)
+			return 0;
+
+		/*
+		 * Make sure the queue is really ours.
+		 */
+		if (u.skb.cpt_owner != -1) {
+			switch (type) {
+			case CPT_SKB_RQ:
+				if (u.skb.cpt_owner != sk->si.cpt_peer) {
+					pr_err("Read queue owner mismatch %d %d at @%li\n",
+					       u.skb.cpt_owner, sk->si.cpt_peer, (long)start);
+					return -1;
+				}
+				break;
+			case CPT_SKB_WQ:
+				if (u.skb.cpt_owner != sk->si.cpt_index) {
+					pr_err("Write queue owner mismatch %d %d at @%li\n",
+					       u.skb.cpt_owner, sk->si.cpt_index, (long)start);
+					return -1;
+				}
+				break;
+			}
+		}
+
+		at = start + u.h.cpt_hdrlen;
+		if (read_obj_hdr(ctx->fd, &u.h, at)) {
+			pr_err("Failed reading header at @%li\n", (long)at);
 			return -1;
 		}
 
 		/*
-		 * Prepare to read unix fd if present.
+		 * It might be 2 kind of objects here
+		 * - CPT_OBJ_BITS for skb data
+		 * - in case of unix sockets there might be
+		 *   a set of file descriptors, which we
+		 *   don't support in criu
 		 */
-		start += u.bits.cpt_next;
-		if (read_obj_hdr(ctx->fd, &u.h, start)) {
-			pr_err("Failed reading header at @%li\n", start);
+		if (u.h.cpt_object == CPT_OBJ_BITS) {
+			if (read_obj_cont(ctx->fd, &u.bits)) {
+				pr_err("Failed reading bits at @%li\n", (long)at);
+				return -1;
+			}
+
+			pe.id_for = obj_id_of(file);
+			pe.length = u.bits.cpt_size;
+
+			if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
+				pr_err("Failed writting bits at @%li\n", (long)at);
+				return -1;
+			}
+
+			if (splice_data(ctx->fd, fd, u.bits.cpt_size)) {
+				pr_err("Failed splicing bits at @%li\n", (long)at);
+				return -1;
+			}
+
+			/*
+			 * Prepare to read unix fd if present.
+			 */
+			at += u.bits.cpt_next;
+			if (read_obj_hdr(ctx->fd, &u.h, start)) {
+				pr_err("Failed reading header at @%li\n", (long)at);
+				return -1;
+			}
+		} else if (u.h.cpt_object == CPT_OBJ_FILEDESC) {
+			pr_err("Found SCM file descriptors, can't proceed at @%li\n", (long)at);
 			return -1;
 		}
-	}
-
-	if (u.h.cpt_object == CPT_OBJ_FILEDESC) {
-		pr_err("Found SCM file descriptors, can't proceed at @%li\n", start);
-		return -1;
 	}
 
 	return 0;
@@ -221,8 +249,9 @@ static int write_read_queue(context_t *ctx, struct file_struct *file, struct soc
 	int fd = fdset_fd(ctx->fdset_glob, CR_FD_SK_QUEUES);
 
 	if (sk->aux_pos.off_rqueue)
-		return __write_skb_queue(ctx, file, sk, fd, sk->aux_pos.off_rqueue);
-
+		return __write_skb_queue(ctx, file, sk, fd, CPT_SKB_RQ,
+					 sk->aux_pos.off_rqueue,
+					 obj_pos_of(sk) + sk->si.cpt_next);
 	return 0;
 }
 
