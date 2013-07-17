@@ -784,7 +784,7 @@ static int sock_read_aux_pos(context_t *ctx, struct sock_struct *sk)
 
 	pr_debug("\t\t\toffs: @%-10li @%-10li @%-10li\n"
 		 "\t\t\t      @%-10li @%-10li @%-10li\n"
-		 "\t\t\tqown: %d %d %d\n",
+		 "\t\t\tqown: %#x %#x %#x\n",
 		 (long)aux->off_skfilter, (long)aux->off_mcaddr, (long)aux->off_rqueue,
 		 (long)aux->off_wqueue, (long)aux->off_ofoqueue, (long)aux->off_synwait_queue,
 		 queue_owners[0], queue_owners[1], queue_owners[2]);
