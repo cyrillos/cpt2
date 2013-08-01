@@ -76,6 +76,6 @@ int main(int argc, char *argv[])
 
 usage:
 	pr_msg("\nUsage:\n");
-	pr_msg("  %s -f <dumpfile> -r <root> [-D <dir>]\n", argv[0]);
+	pr_msg("  %s -f <dumpfile> -r <root> [-D <dir>] [-d]\n", argv[0]);
 	return -1;
 }
