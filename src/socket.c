@@ -804,7 +804,7 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 		pr_debug("\t\t\t%10s (%u)\n\t\t\t", prefix, (unsigned int)len);
 
 		for (i = 0; i < len; i++) {
-			pr_debug("0x%02x:", (int)src[i]);
+			pr_debug("0x%02x:", (unsigned char)src[i]);
 			if (!((i + 1) % 8))
 				pr_debug("\n\t\t\t");
 		}
