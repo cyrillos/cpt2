@@ -378,6 +378,7 @@ int read_ifaddr(context_t *ctx)
 
 		list_add_tail(&ifa->list, &ifaddr_list);
 
+		obj_hash_typed_to(ifa, CPT_OBJ_NET_IFADDR, start);
 		start += ifa->ii.cpt_next;
 
 		show_ifaddr_cont(ctx, ifa);
