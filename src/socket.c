@@ -679,6 +679,73 @@ err:
 	return ret;
 }
 
+static bool can_dump_inet_sk(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
+{
+	/*
+	 * We must have checked the family already but just in case.
+	 */
+	switch (sk->si.cpt_family) {
+	case AF_INET:
+	case AF_INET6:
+		break;
+	default:
+		pr_err("Unsupported family %d\n",
+		       (int)sk->si.cpt_family);
+		return false;
+	}
+
+	if (sk->si.cpt_shutdown) {
+		pr_err("Unsupported shutdown inet socket %d\n",
+		       (int)sk->si.cpt_shutdown);
+		return false;
+	}
+
+	switch (sk->si.cpt_type) {
+	case SOCK_DGRAM:
+		if (sk->aux_pos.off_wqueue) {
+			pr_err("Corked dgram socket\n");
+			return false;
+		} else if (sk->aux_pos.off_rqueue) {
+			pr_warn("Read queue is dropped for socket %x\n",
+				obj_id_of(sk));
+		}
+		break;
+	case SOCK_STREAM:
+		break;
+	default:
+		pr_err("Unsupported socket type %d\n",
+		       (int)sk->si.cpt_type);
+		return false;
+	}
+
+	switch (sk->si.cpt_state) {
+	case TCP_LISTEN:
+		break;
+	case TCP_ESTABLISHED:
+		break;
+	case TCP_CLOSE:
+		break;
+	default:
+		pr_err("Unsupported socket state %d\n",
+		       (int)sk->si.cpt_state);
+		return false;
+	}
+
+	switch (sk->si.cpt_protocol) {
+	case IPPROTO_IP:
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+	case IPPROTO_UDPLITE:
+		break;
+	default:
+		pr_err("Unsupported protocol %d\n",
+		       (int)sk->si.cpt_protocol);
+		return false;
+	}
+
+	return true;
+}
+
 static int write_inet_socket(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
 {
 	SkOptsEntry skopts = SK_OPTS_ENTRY__INIT;
@@ -692,6 +759,11 @@ static int write_inet_socket(context_t *ctx, struct file_struct *file, struct so
 
 	if (file->dumped)
 		return 0;
+
+	if (!can_dump_inet_sk(ctx, file, sk)) {
+		pr_err("Can't convert socket at @%li\n", obj_pos_of(sk));
+		return -1;
+	}
 
 	fill_fown(&fown, file);
 
