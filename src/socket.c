@@ -13,10 +13,12 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_addr.h>
+#include <linux/if_ether.h>
 #include <linux/filter.h>
 #include <linux/sockios.h>
 
 #include <netinet/tcp.h>
+#include <netinet/ip.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -139,27 +141,89 @@ static bool can_dump_unix_sk(const struct sock_struct *sk)
 	return true;
 }
 
-static int __write_skb_queue(context_t *ctx, struct file_struct *file,
-			     struct sock_struct *sk, int fd,
-			     unsigned int type, off_t start, off_t end)
+static int __write_skb_payload(context_t *ctx, struct file_struct *file,
+			       struct sock_struct *sk,
+			       struct cpt_skb_image *skb,
+			       int fd, off_t start, off_t end)
 {
 	SkPacketEntry pe = SK_PACKET_ENTRY__INIT;
 
 	union {
 		struct cpt_object_hdr	h;
-		struct cpt_skb_image	skb;
 		struct cpt_obj_bits	bits;
 		struct cpt_fd_image	fdi;
 	} u;
-	off_t next, at;
+	off_t next;
 
+	for (; start < end; start += next) {
+		if (read_obj_hdr(ctx->fd, &u.h, start)) {
+			pr_err("Failed reading header at @%li\n", (long)start);
+			return -1;
+		}
+
+		next = u.h.cpt_next;
+
+		switch (u.h.cpt_object) {
+		case CPT_OBJ_BITS:
+			break;
+		case CPT_OBJ_FILEDESC:
+			pr_err("Found SCM file descriptors, can't proceed at @%li\n",
+			       (long)start);
+			return -1;
+		default:
+			/*
+			 * Skip anything else objects, like
+			 * CPT_OBJ_SOCKET and such for a while
+			 */
+			pr_debug("Skipping SKB payload object %s at @%li\n",
+				 obj_name(u.h.cpt_object), (long)start);
+			continue;
+		}
+
+		if (read_obj_cont(ctx->fd, &u.bits)) {
+			pr_err("Failed reading bits at @%li\n", (long)start);
+			return -1;
+		}
+
+		if (skb->cpt_hspace) {
+			if (lseek_safe(ctx->fd, skb->cpt_hspace, SEEK_CUR))
+				return -1;
+		}
+
+		pe.id_for = obj_id_of(file);
+		pe.length = skb->cpt_len;
+
+		if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
+			pr_err("Failed writting bits at @%li\n", (long)start);
+			return -1;
+		}
+
+		if (splice_data(ctx->fd, fd, skb->cpt_len)) {
+			pr_err("Failed splicing bits at @%li\n", (long)start);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int __write_skb_queue(context_t *ctx, struct file_struct *file,
+			     struct sock_struct *sk, int fd,
+			     unsigned int type, off_t start, off_t end)
+{
+	union {
+		struct cpt_object_hdr	h;
+		struct cpt_skb_image	skb;
+	} u;
+	off_t next, at;
 
 	for (; start < end; start += next) {
 		if (read_obj_type_hdr(ctx->fd, CPT_OBJ_SKB, &u.h, start)) {
 			pr_err("Failed reading skb header at @%li\n", start);
 			return -1;
 		}
-		if (read_obj_cont_until(ctx->fd, &u.skb, cpt_stamp)) {
+
+		if (read_obj_cont(ctx->fd, &u.skb)) {
 			pr_err("Can't read skb at @%li\n", (long)start);
 			return -1;
 		}
@@ -199,47 +263,8 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 		}
 
 		at = start + u.h.cpt_hdrlen;
-		if (read_obj_hdr(ctx->fd, &u.h, at)) {
-			pr_err("Failed reading header at @%li\n", (long)at);
-			return -1;
-		}
-
-		/*
-		 * It might be 2 kind of objects here
-		 * - CPT_OBJ_BITS for skb data
-		 * - in case of unix sockets there might be
-		 *   a set of file descriptors, which we
-		 *   don't support in criu
-		 */
-		if (u.h.cpt_object == CPT_OBJ_BITS) {
-			if (read_obj_cont(ctx->fd, &u.bits)) {
-				pr_err("Failed reading bits at @%li\n", (long)at);
-				return -1;
-			}
-
-			pe.id_for = obj_id_of(file);
-			pe.length = u.bits.cpt_size;
-
-			if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
-				pr_err("Failed writting bits at @%li\n", (long)at);
-				return -1;
-			}
-
-			if (splice_data(ctx->fd, fd, u.bits.cpt_size)) {
-				pr_err("Failed splicing bits at @%li\n", (long)at);
-				return -1;
-			}
-
-			/*
-			 * Prepare to read unix fd if present.
-			 */
-			at += u.bits.cpt_next;
-			if (read_obj_hdr(ctx->fd, &u.h, start)) {
-				pr_err("Failed reading header at @%li\n", (long)at);
-				return -1;
-			}
-		} else if (u.h.cpt_object == CPT_OBJ_FILEDESC) {
-			pr_err("Found SCM file descriptors, can't proceed at @%li\n", (long)at);
+		if (__write_skb_payload(ctx, file, sk, &u.skb, fd, at, at + next)) {
+			pr_err("Failed converting SKB payload at @%li\n", (long)at);
 			return -1;
 		}
 	}
