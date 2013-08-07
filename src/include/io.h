@@ -48,4 +48,18 @@ static inline int close_safe(int *fd)
 	return ret;
 }
 
+static inline int lseek_safe(int fd, off_t offset, int whence)
+{
+	off_t new;
+
+	new = lseek(fd, offset, whence);
+	if (new == (off_t)-1) {
+		pr_perror("Failed to seek %li as %d\n",
+			  (long)offset, whence);
+		return -1;
+	}
+
+	return 0;
+}
+
 #endif /* __CPT2_IO_H__ */
