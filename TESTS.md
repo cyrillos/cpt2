@@ -87,27 +87,25 @@ ZDTM statistics
 + static/socket_udp
 + static/unbound_sock
 + static/socket-ext
-+ static/socket-tcp
 
-sh test/zdtm-cpt2.sh start static/pipe00 static/pipe01 static/cwd00 static/env00 static/maps00 static/mprotect00 static/mtime_mmap static/sleeping00 static/write_read00 static/write_read01 static/write_read02 static/write_read10 static/wait00 static/vdso00 static/file_shared static/sched_prio00 static/timers static/xids00 static/groups static/umask00 static/cmdlinenv00 static/futex static/futex-rl static/pthread00 static/pthread01 static/pid00 static/pstree static/selfexe00 static/eventfs00 static/inotify00 static/fifo-rowo-pair static/fifo static/fifo_wronly static/zombie00 static/rlimits00 static/cow01 static/fpu00 static/fpu01 static/mmx00 static/sse00 static/sse20 static/fdt_shared static/unlink_fstat00 static/unlink_fstat02 static/child_opened_proc static/file_fown static/sockets00 static/sockets_dgram static/sockets01 static/socket_listen static/sk-unix-unconn static/sockets_spair static/socket_queues static/socket_udp static/unbound_sock static/socket-ext static/socket-tcp
+These two requires test fixup itself (crc fails since crc value
+is not seen in children processes)
+
++ static/socket-tcp
++ static/socket-tcp6
+
+sh test/zdtm-cpt2.sh start static/pipe00 static/pipe01 static/cwd00 static/env00 static/maps00 static/mprotect00 static/mtime_mmap static/sleeping00 static/write_read00 static/write_read01 static/write_read02 static/write_read10 static/wait00 static/vdso00 static/file_shared static/sched_prio00 static/timers static/xids00 static/groups static/umask00 static/cmdlinenv00 static/futex static/futex-rl static/pthread00 static/pthread01 static/pid00 static/pstree static/selfexe00 static/eventfs00 static/inotify00 static/fifo-rowo-pair static/fifo static/fifo_wronly static/zombie00 static/rlimits00 static/cow01 static/fpu00 static/fpu01 static/mmx00 static/sse00 static/sse20 static/fdt_shared static/unlink_fstat00 static/unlink_fstat02 static/child_opened_proc static/file_fown static/sockets00 static/sockets_dgram static/sockets01 static/socket_listen static/sk-unix-unconn static/sockets_spair static/socket_queues static/socket_udp static/unbound_sock static/socket-ext
 
 [root@ovz criu]# cat test/zdtm/live/static/sk-netlink.out
 18:10:11.032:   766: ERR: sk-netlink.c:104: Cant send request message (errno = 111 (Connection refused))
 [root@ovz criu]#
 
 [root@ovz criu]# cat test/zdtm/live/static/socket-tcpbuf.out
-18:06:30.105:   910: The port 8880 is already in use.
-18:06:30.105:   910: The port 8881 is already in use.
-18:06:30.105:   910: The port 8882 is already in use.
 18:06:30.114:   910: snd_size = 295205
 18:10:11.107:   910: ERR: socket-tcpbuf.c:218: shutdown (errno = 107 (Transport endpoint is not connected))
 [root@ovz criu]#
 
 [root@ovz criu]# cat test/zdtm/live/static/socket-tcpbuf6.out
-18:06:30.167:   946: The port 8880 is already in use.
-18:06:30.167:   946: The port 8881 is already in use.
-18:06:30.167:   946: The port 8882 is already in use.
-18:06:30.167:   946: The port 8883 is already in use.
 18:06:30.179:   946: snd_size = 294848
 18:10:11.129:   946: ERR: socket-tcpbuf6.c:218: shutdown (errno = 107 (Transport endpoint is not connected))
 [root@ovz criu]#
@@ -119,15 +117,14 @@ In progress
 
 - static/socket_listen6
 - static/socket6_udp
-- static/socket-tcp6
 - static/sock_opts00
 - static/sock_opts01
 - static/packet_sock
 - static/sock_filter
 - static/socket_udplite
-static/sk-netlink
-static/socket-tcpbuf
-static/socket-tcpbuf6
+- static/sk-netlink
+- static/socket-tcpbuf
+- static/socket-tcpbuf6
 
 Not yet run
 -----------
