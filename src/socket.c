@@ -162,6 +162,8 @@ static int __write_skb_payload(context_t *ctx, struct file_struct *file,
 		}
 
 		next = u.h.cpt_next;
+		if (next <= u.h.cpt_hdrlen)
+			continue;
 
 		switch (u.h.cpt_object) {
 		case CPT_OBJ_BITS:
@@ -175,7 +177,7 @@ static int __write_skb_payload(context_t *ctx, struct file_struct *file,
 			 * Skip anything else objects, like
 			 * CPT_OBJ_SOCKET and such for a while
 			 */
-			pr_debug("Skipping SKB payload object %s at @%li\n",
+			pr_debug("\tSkipping SKB payload object %s at @%li\n",
 				 obj_name(u.h.cpt_object), (long)start);
 			continue;
 		}
@@ -215,7 +217,7 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 		struct cpt_object_hdr	h;
 		struct cpt_skb_image	skb;
 	} u;
-	off_t next, at;
+	off_t next;
 
 	for (; start < end; start += next) {
 		if (read_obj_type_hdr(ctx->fd, CPT_OBJ_SKB, &u.h, start)) {
@@ -227,8 +229,8 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 			pr_err("Can't read skb at @%li\n", (long)start);
 			return -1;
 		}
-		next = u.h.cpt_next;
 
+		next = u.h.cpt_next;
 		if (next <= u.h.cpt_hdrlen)
 			continue;
 
@@ -262,9 +264,10 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 			}
 		}
 
-		at = start + u.h.cpt_hdrlen;
-		if (__write_skb_payload(ctx, file, sk, &u.skb, fd, at, at + next)) {
-			pr_err("Failed converting SKB payload at @%li\n", (long)at);
+		if (__write_skb_payload(ctx, file, sk, &u.skb, fd,
+					start + u.h.cpt_hdrlen, start + next)) {
+			pr_err("Failed converting SKB payload at @%li\n",
+			       (long)start + u.h.cpt_hdrlen);
 			return -1;
 		}
 	}
@@ -656,9 +659,6 @@ static int write_tcp(context_t *ctx, struct file_struct *file, struct sock_struc
 		tse.has_rcv_wscale	= true;
 	}
 
-	/*
-	 * FIXME Incomplete!!!
-	 */
 	if (tse.opt_mask & TCPI_OPT_TIMESTAMPS) {
 		tse.timestamp		= (u32)ctx->h.cpt_start_jiffies64;
 		tse.has_timestamp	= true;
