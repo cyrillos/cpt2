@@ -136,6 +136,9 @@ int convert(void)
 	if (ret)
 		goto out;
 
+	pr_debug("Reading dumpifile\n");
+	pr_debug("==============================\n");
+
 	ret = read_dumpfile(&ctx);
 	if (ret) {
 		pr_err("Failed reading dumpfile %s\n",
@@ -150,6 +153,9 @@ int convert(void)
 	ret = context_init_fdset_ns(&ctx, root_task->ti.cpt_pid);
 	if (ret)
 		goto out;
+
+	pr_debug("Writing CRIU images\n");
+	pr_debug("==============================\n");
 
 	ret = write_task_images(&ctx);
 	if (ret) {
