@@ -912,7 +912,7 @@ static int write_netlink_socket(context_t *ctx,
 
 int write_socket(context_t *ctx, struct file_struct *file)
 {
-	struct sock_struct *sk = sk_lookup_file(obj_of(file)->o_pos);
+	struct sock_struct *sk = sk_lookup_file(obj_pos_of(file));
 	int ret = -1;
 
 	BUG_ON(!sk);

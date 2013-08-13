@@ -236,7 +236,7 @@ static int read_inotify_watch(context_t *ctx, off_t start, off_t end, struct ino
 		file->name = NULL;
 		file->namelen = 0;
 
-		at = obj_of(wd)->o_pos + wd->wdi.cpt_hdrlen;
+		at = obj_pos_of(wd) + wd->wdi.cpt_hdrlen;
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_FILE, &file->fi, at)) {
 			obj_free_to(file);
 			pr_err("Can't read file object at @%li\n", (long)at);
@@ -254,7 +254,7 @@ static int read_inotify_watch(context_t *ctx, off_t start, off_t end, struct ino
 
 		list_add_tail(&wd->list, &inotify->wd_list);
 
-		at = obj_of(file)->o_pos + file->fi.cpt_hdrlen;
+		at = obj_pos_of(file) + file->fi.cpt_hdrlen;
 		file->name = read_name(ctx->fd, at, &file->namelen, NULL);
 		if (IS_ERR(file->name)) {
 			file->name = NULL;
@@ -294,8 +294,8 @@ int read_inotify(context_t *ctx)
 
 		start += inotify->ii.cpt_next;
 
-		from = obj_of(inotify)->o_pos + inotify->ii.cpt_hdrlen;
-		to = obj_of(inotify)->o_pos + inotify->ii.cpt_next;
+		from = obj_pos_of(inotify) + inotify->ii.cpt_hdrlen;
+		to = obj_pos_of(inotify) + inotify->ii.cpt_next;
 
 		/*
 		 * FIXME What about event queue? This is CPT_CONTENT_ARRAY

@@ -161,7 +161,7 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 	if (S_ISSOCK(file->fi.cpt_i_mode)) {
 		struct sock_struct *sk;
 
-		sk = sk_lookup_file(obj_of(file)->o_pos);
+		sk = sk_lookup_file(obj_pos_of(file));
 		if (!sk) {
 			pr_err("Can't find socket for @%li\n",
 			       obj_pos_of(file));
@@ -244,7 +244,7 @@ static int dump_remaped_file(context_t *ctx, struct file_struct *file,
 		FownEntry fown = FOWN_ENTRY__INIT;
 
 		int regfile_fd = fdset_fd(ctx->fdset_glob, CR_FD_REG_FILES);
-		off_t where = obj_of(inode)->o_pos + inode->ii.cpt_hdrlen;
+		off_t where = obj_pos_of(inode) + inode->ii.cpt_hdrlen;
 
 		char *name = NULL;
 
@@ -322,8 +322,8 @@ static int dump_ghost_file_content(context_t *ctx, int fd,
 	off_t start, end;
 	int ret = -1;
 
-	start	= (off_t)obj_of(inode)->o_pos + (off_t)inode->ii.cpt_hdrlen;
-	end	= (off_t)obj_of(inode)->o_pos + (off_t)inode->ii.cpt_next;
+	start	= obj_pos_of(inode) + inode->ii.cpt_hdrlen;
+	end	= obj_pos_of(inode) + inode->ii.cpt_next;
 
 	/*
 	 * FIXME Somehow unify with write_page_block routine?
@@ -532,7 +532,6 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 {
 	int fd = fdset_fd(ctx->fdset_glob, is_pipe ? CR_FD_PIPES_DATA : CR_FD_FIFO_DATA);
 	PipeDataEntry pde = PIPE_DATA_ENTRY__INIT;
-	obj_t *obj = obj_of(inode);
 	off_t start;
 
 	union {
@@ -552,7 +551,7 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	if (inode->ii.cpt_next == inode->ii.cpt_hdrlen)
 		return 0;
 
-	start = obj->o_pos + inode->ii.cpt_hdrlen;
+	start = obj_pos_of(inode) + inode->ii.cpt_hdrlen;
 
 	if (read_obj_hdr(ctx->fd, &u.h, start)) {
 		pr_err("Failed to read object header at @%li\n",
@@ -618,7 +617,7 @@ static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode for pipe on file @%li\n",
-		       (long)obj_of(file)->o_pos);
+		       obj_pos_of(file));
 		return -1;
 	}
 
@@ -657,14 +656,14 @@ static int write_fifo_entry(context_t *ctx, struct file_struct *file)
 	ret = write_reg_file_entry(ctx, file);
 	if (ret) {
 		pr_err("Failed wirtting fifo path at @%li\n",
-		       (long)obj_of(file)->o_pos);
+		       obj_pos_of(file));
 		return -1;
 	}
 
 	inode = obj_lookup_to(CPT_OBJ_INODE, file->fi.cpt_inode);
 	if (!inode) {
 		pr_err("No inode for fifo on file @%li\n",
-		       (long)obj_of(file)->o_pos);
+		       obj_pos_of(file));
 		return -1;
 	}
 
@@ -1019,7 +1018,7 @@ static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 	if (file->fi.cpt_next > file->fi.cpt_hdrlen) {
 		off_t from, end = 0;
 
-		from = obj_of(file)->o_pos + file->fi.cpt_hdrlen;
+		from = obj_pos_of(file) + file->fi.cpt_hdrlen;
 
 		/*
 		 * Some underlied data present, which might be one of
@@ -1178,8 +1177,8 @@ int read_files(context_t *ctx)
 		/*
 		 * Read underlied file descriptors.
 		 */
-		for (from = obj_of(files)->o_pos + files->fsi.cpt_hdrlen,
-		     to = obj_of(files)->o_pos + files->fsi.cpt_next;
+		for (from = obj_pos_of(files) + files->fsi.cpt_hdrlen,
+		     to = obj_pos_of(files) + files->fsi.cpt_next;
 		     from < to;
 		     from += fd->fdi.cpt_next) {
 

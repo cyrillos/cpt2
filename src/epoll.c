@@ -51,8 +51,8 @@ static int write_epoll_tfds(context_t *ctx, struct file_struct *file, struct epo
 	off_t start, end;
 	int ret = -1;
 
-	start	= obj_of(epoll)->o_pos + epoll->ei.cpt_hdrlen;
-	end	= obj_of(epoll)->o_pos + epoll->ei.cpt_next;
+	start	= obj_pos_of(epoll) + epoll->ei.cpt_hdrlen;
+	end	= obj_pos_of(epoll) + epoll->ei.cpt_next;
 
 	for (; start < end; start += efi.cpt_next) {
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_EPOLL_FILE, &efi, start)) {
@@ -85,7 +85,7 @@ int write_epoll(context_t *ctx, struct file_struct *file)
 	if (file->dumped)
 		return 0;
 
-	epoll = epoll_lookup_file(obj_of(file)->o_pos);
+	epoll = epoll_lookup_file(obj_pos_of(file));
 	BUG_ON(!epoll);
 
 	fill_fown(&fown, file);

@@ -903,8 +903,8 @@ static int task_read_aux_pos(context_t *ctx, struct task_struct *t)
 	struct cpt_object_hdr h;
 	off_t start;
 
-	for (start = obj_of(t)->o_pos + t->ti.cpt_hdrlen;
-	     start < obj_of(t)->o_pos + t->ti.cpt_next;
+	for (start = obj_pos_of(t) + t->ti.cpt_hdrlen;
+	     start < obj_pos_of(t) + t->ti.cpt_next;
 	     start += h.cpt_next) {
 
 		if (read_obj_hdr(ctx->fd, &h, start)) {

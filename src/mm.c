@@ -262,8 +262,8 @@ static int write_copy_pages(context_t *ctx, int pagemap_fd, int page_fd,
 		 * need to read them and write into image.
 		 */
 		if (write_page_block(ctx, pagemap_fd, page_fd,
-				     obj_of(vma)->o_pos + vma->vmai.cpt_hdrlen,
-				     obj_of(vma)->o_pos + vma->vmai.cpt_next,
+				     obj_pos_of(vma) + vma->vmai.cpt_hdrlen,
+				     obj_pos_of(vma) + vma->vmai.cpt_next,
 				     false, cpb->cpt_start, cpb->cpt_end))
 			goto err;
 		break;
@@ -428,8 +428,8 @@ static int write_vma_pages(context_t *ctx, int pagemap_fd, int page_fd,
 		return write_vdso_pages(ctx, pagemap_fd, page_fd, vma);
 
 	return write_page_block(ctx, pagemap_fd, page_fd,
-				obj_of(vma)->o_pos + vma->vmai.cpt_hdrlen,
-				obj_of(vma)->o_pos + vma->vmai.cpt_next,
+				obj_pos_of(vma) + vma->vmai.cpt_hdrlen,
+				obj_pos_of(vma) + vma->vmai.cpt_next,
 				true, 0, 0);
 }
 
