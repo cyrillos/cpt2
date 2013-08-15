@@ -6,6 +6,9 @@
 #include "compiler.h"
 #include "types.h"
 
+#define CPT_NULL	(~0ULL)
+#define CPT_NOINDEX	(~0U)
+
 #define __cpt_aligned			__aligned(8)
 
 enum _cpt_object_type {
