@@ -234,13 +234,8 @@ static int __write_skb_queue(context_t *ctx, struct file_struct *file,
 		if (next <= u.h.cpt_hdrlen)
 			continue;
 
-		/*
-		 * We know that queues with same type are written
-		 * sequently, thus exit out early once meet one
-		 * different.
-		 */
 		if (u.skb.cpt_queue != type)
-			return 0;
+			continue;
 
 		/*
 		 * Make sure the queue is really ours.
