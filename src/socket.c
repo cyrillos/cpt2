@@ -192,12 +192,14 @@ static int __write_skb_payload(context_t *ctx, struct file_struct *file,
 				return -1;
 		}
 
-		pe.id_for = obj_id_of(file);
-		pe.length = skb->cpt_len;
+		if (sk->si.cpt_family == PF_UNIX) {
+			pe.id_for = obj_id_of(file);
+			pe.length = skb->cpt_len;
 
-		if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
-			pr_err("Failed writting bits at @%li\n", (long)start);
-			return -1;
+			if (pb_write_one(fd, &pe, PB_SK_QUEUES)) {
+				pr_err("Failed packet entry at @%li\n", (long)start);
+				return -1;
+			}
 		}
 
 		if (splice_data(ctx->fd, fd, skb->cpt_len)) {
