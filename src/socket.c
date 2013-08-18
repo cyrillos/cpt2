@@ -1122,6 +1122,10 @@ int read_sockets(context_t *ctx)
 		sk = obj_alloc_to(struct sock_struct, si);
 		if (!sk)
 			return -1;
+		INIT_HLIST_NODE(&sk->hash);
+		INIT_HLIST_NODE(&sk->index_hash);
+		INIT_LIST_HEAD(&sk->list);
+		sk->dumped = false;
 
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_SOCKET, &sk->si, start)) {
 			obj_free_to(sk);
@@ -1129,10 +1133,8 @@ int read_sockets(context_t *ctx)
 			return -1;
 		}
 
-		INIT_HLIST_NODE(&sk->hash);
-		INIT_HLIST_NODE(&sk->index_hash);
-		INIT_LIST_HEAD(&sk->list);
-		sk->dumped = false;
+		obj_push_hash_to(sk, CPT_OBJ_SOCKET, start);
+		start += sk->si.cpt_next;
 
 		hash_add(sock_hash, &sk->hash, sk->si.cpt_file);
 
@@ -1146,14 +1148,11 @@ int read_sockets(context_t *ctx)
 		if (sk->si.cpt_family == PF_UNIX)
 			list_add(&sk->list, &unix_sock_list);
 
-		obj_push_hash_to(sk, CPT_OBJ_SOCKET, start);
-		start += sk->si.cpt_next;
-
 		fix_unix_names(sk);
 		show_sock_cont(ctx, sk);
 
 		if (sock_read_aux_pos(ctx, sk)) {
-			pr_err("Failed read socket aux positions at @%li\n", (long)start);
+			pr_err("Failed read socket aux positions at @%li\n",  obj_pos_of(sk));
 			return -1;
 		}
 
