@@ -1038,6 +1038,18 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 			pr_debug("\n\t\t\t --> ");
 			for (i = 0; i < len; i++)
 				pr_debug("%c", isprint(src[i]) ? src[i] : '.');
+		} else if (family == PF_INET || PF_INET6) {
+			char buf[INET_ADDRSTRLEN];
+
+			pr_debug("\t\t\t --> %s",
+				 inet_ntop(PF_INET, (void *)&((struct sockaddr_in *)src)->sin_addr,
+					   buf, sizeof(buf)));
+		} else if (family == PF_INET6) {
+			char buf[INET6_ADDRSTRLEN];
+
+			pr_debug("\t\t\t --> %s",
+				 inet_ntop(PF_INET6, (void *)&((struct sockaddr_in6 *)src)->sin6_addr,
+					   buf, sizeof(buf)));
 		}
 		pr_debug("\n");
 	}
@@ -1045,6 +1057,8 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 
 static void show_sock_addrs(struct sock_struct *sk)
 {
+	pr_debug("\t\t\tsport %d dport %d\n", ntohs(sk->si.cpt_sport), ntohs(sk->si.cpt_dport));
+
 	show_sock_addr("local ", sk->si.cpt_family, (char *)sk->si.cpt_laddr, sk->si.cpt_laddrlen);
 	show_sock_addr("remote", sk->si.cpt_family, (char *)sk->si.cpt_raddr, sk->si.cpt_raddrlen);
 }
@@ -1053,13 +1067,15 @@ static void show_sock_cont(context_t *ctx, struct sock_struct *sk)
 {
 	pr_debug("\t@%-10li file @%-10li parent %8d index %#x type %6d family %6d state %d\n"
 		 "\t\tssflags %#lx sstate %#2x reuse %#2x zapped %#2x shutdown %#2x protocol %#2x\n"
-		 "\t\tflags %#lx peer %#x socketpair %#2x sockflags %#2x cpt_bound_dev_if %#2x\n",
+		 "\t\tflags %#lx peer %#x socketpair %#2x sockflags %#2x cpt_bound_dev_if %#2x\n"
+		 "\t\tcpt_ipv6only6 %2x cpt_rcv_nxt %10u cpt_write_seq %10u\n",
 		 obj_pos_of(sk), (long)sk->si.cpt_file, sk->si.cpt_parent,
 		 sk->si.cpt_index, (int)sk->si.cpt_type, (int)sk->si.cpt_family,
 		 (int)sk->si.cpt_state, (long)sk->si.cpt_ssflags, sk->si.cpt_sstate,
 		 sk->si.cpt_reuse, sk->si.cpt_zapped, sk->si.cpt_shutdown, sk->si.cpt_protocol,
 		 (long)sk->si.cpt_flags, sk->si.cpt_peer, sk->si.cpt_socketpair,
-		 sk->si.cpt_sockflags, sk->si.cpt_bound_dev_if);
+		 sk->si.cpt_sockflags, sk->si.cpt_bound_dev_if, (int)sk->si.cpt_ipv6only6,
+		 sk->si.cpt_rcv_nxt, sk->si.cpt_write_seq);
 
 	pr_debug("\t\t\ttype %12s family %12s state %12s ino %#x\n",
 		 sk->si.cpt_type < ARRAY_SIZE(sock_types) ? sock_types[sk->si.cpt_type] : "UNK",
