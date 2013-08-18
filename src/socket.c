@@ -351,7 +351,7 @@ static int fill_socket_opts(context_t *ctx, const struct sock_struct *sk, SkOpts
 	/* FIXME No so_mark in image */
 	skopts->has_so_mark	= false;
 
-	if (sk->si.cpt_sndtimeo == MAX_SCHEDULE_TIMEOUT) {
+	if (sk->si.cpt_sndtimeo == CPT_NULL) {
 		skopts->so_snd_tmo_sec = 0;
 		skopts->so_snd_tmo_usec = 0;
 	} else {
@@ -359,7 +359,7 @@ static int fill_socket_opts(context_t *ctx, const struct sock_struct *sk, SkOpts
 		skopts->so_snd_tmo_usec = ((sk->si.cpt_sndtimeo % ctx->h.cpt_hz) * 1000000) / ctx->h.cpt_hz;
 	}
 
-	if (sk->si.cpt_sndtimeo == MAX_SCHEDULE_TIMEOUT) {
+	if (sk->si.cpt_sndtimeo == CPT_NULL) {
 		skopts->so_rcv_tmo_sec = 0;
 		skopts->so_rcv_tmo_usec = 0;
 	} else {
