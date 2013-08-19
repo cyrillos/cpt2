@@ -256,6 +256,21 @@ static int read_core_data(context_t *ctx, struct task_struct *t, CoreEntry *core
 	}
 
 	/*
+	 * Thread alternative signal stack is small as well.
+	 */
+	if (t->aux_pos.off_sigaltstack) {
+		struct cpt_sigaltstack_image si;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_SIGALTSTACK, &si, t->aux_pos.off_sigaltstack)) {
+			pr_err("Can't read task sigaltstack at @%li\n", (long)t->aux_pos.off_sigaltstack);
+			return -1;
+		}
+
+		core->thread_core->sas->ss_sp	= si.cpt_stack;
+		core->thread_core->sas->ss_size	= si.cpt_stacksize;
+	}
+
+	/*
 	 * FIXME Please make sure all t->aux_pos are covered
 	 */
 
@@ -266,6 +281,7 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 {
 	ThreadCoreEntry thread_core = THREAD_CORE_ENTRY__INIT;
 	ThreadInfoX86 thread_info = THREAD_INFO_X86__INIT;
+	ThreadSasEntry sas = THREAD_SAS_ENTRY__INIT;
 	TaskCoreEntry tc = TASK_CORE_ENTRY__INIT;
 	CoreEntry core = CORE_ENTRY__INIT;
 
@@ -288,6 +304,9 @@ static int write_task_core(context_t *ctx, struct task_struct *t, bool is_thread
 	core.mtype			= CORE_ENTRY__MARCH__X86_64;
 	core.thread_info		= &thread_info;
 	core.tc				= &tc;
+
+	if (t->aux_pos.off_sigaltstack)
+		thread_core.sas		= &sas;
 
 	core.thread_core		= &thread_core;
 
