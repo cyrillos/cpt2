@@ -608,6 +608,18 @@ static int tcp_emulate_ioctl(struct sock_struct *sk, int cmd)
 	return answ;
 }
 
+static u32 tcp_timestamp(context_t *ctx)
+{
+	/*
+	 * Timestamps are a bit tricky. In CRIU we
+	 * use plaint @tcp_time_stamp variable obtained
+	 * from socket option, but in OpenVZ the easiest
+	 * solution is to use @cpt_start_jiffies64 which
+	 * actually carries @virt_jiffies64.
+	 */
+	return (u32)ctx->h.cpt_start_jiffies64;
+}
+
 static int write_tcp(context_t *ctx, struct file_struct *file, struct sock_struct *sk)
 {
 	int fd = open_image(ctx, CR_FD_TCP_STREAM, O_DUMP, obj_id_of(sk));
@@ -657,7 +669,7 @@ static int write_tcp(context_t *ctx, struct file_struct *file, struct sock_struc
 	}
 
 	if (tse.opt_mask & TCPI_OPT_TIMESTAMPS) {
-		tse.timestamp		= (u32)ctx->h.cpt_start_jiffies64;
+		tse.timestamp		= tcp_timestamp(ctx);
 		tse.has_timestamp	= true;
 	}
 
