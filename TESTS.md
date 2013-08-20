@@ -89,6 +89,8 @@ ZDTM statistics
 + static/socket-tcp
 + static/socket-tcp6
 + static/sigaltstack
++ static/socket-tcpbuf
++ static/socket-tcpbuf6
 
 - static/packet_sock
 	- fails in openvz. First -- 2.6.32 doesn not
@@ -100,24 +102,7 @@ sh test/zdtm-cpt2.sh start static/pipe00 static/pipe01 static/cwd00 static/env00
 
 One by one tests (because of ports conflict)
 
-sh test/zdtm-cpt2.sh start static/socket-tcp
-sh test/zdtm-cpt2.sh start static/socket-tcp6
-
-[root@ovz criu]# cat test/zdtm/live/static/sk-netlink.out
-18:10:11.032:   766: ERR: sk-netlink.c:104: Cant send request message (errno = 111 (Connection refused))
-[root@ovz criu]#
-
-[root@ovz criu]# cat test/zdtm/live/static/socket-tcpbuf.out
-18:06:30.114:   910: snd_size = 295205
-18:10:11.107:   910: ERR: socket-tcpbuf.c:218: shutdown (errno = 107 (Transport endpoint is not connected))
-[root@ovz criu]#
-
-[root@ovz criu]# cat test/zdtm/live/static/socket-tcpbuf6.out
-18:06:30.179:   946: snd_size = 294848
-18:10:11.129:   946: ERR: socket-tcpbuf6.c:218: shutdown (errno = 107 (Transport endpoint is not connected))
-[root@ovz criu]#
-
-sh test/zdtm-cpt2.sh start static/sk-netlink static/socket-tcpbuf static/socket-tcpbuf6
+sh test/zdtm-cpt2.sh start static/socket-tcpbuf static/socket-tcpbuf6
 
 In progress
 -----------
@@ -129,8 +114,6 @@ In progress
 - static/sock_filter
 - static/socket_udplite
 - static/sk-netlink
-- static/socket-tcpbuf
-- static/socket-tcpbuf6
 
 Not yet run
 -----------
