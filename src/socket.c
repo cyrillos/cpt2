@@ -916,6 +916,8 @@ static int write_netlink_socket(context_t *ctx,
 
 	ret = pb_write_one(fd, &ne, PB_NETLINKSK);
 
+	pr_warn_once("Netlink sockets are not supported.\n"
+		     "You probably fail on restore\n");
 	return ret;
 }
 
