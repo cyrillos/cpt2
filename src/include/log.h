@@ -64,17 +64,23 @@ extern void print_on_level(unsigned int loglevel, const char *format, ...);
 	pr_err(fmt ": %m\n", ##__VA_ARGS__)
 
 /*
- * Some helpers for reading.
+ * Read/write info helpers.
  */
-#define pr_read_start(msg)					\
-	do {							\
-		pr_info("Reading " msg);			\
-		pr_debug("------------------------------\n");	\
+#define pr_prefix_start(prefix, msg)						\
+	do {									\
+		pr_info(prefix msg);						\
+		pr_debug("------------------------------\n");			\
 	} while (0)
 
-#define pr_read_end()						\
-	do {							\
-		pr_debug("------------------------------\n\n");	\
+#define pr_prefix_end()								\
+	do {									\
+		pr_debug("------------------------------\n\n");			\
 	} while (0)
+
+#define pr_read_start(msg)	pr_prefix_start("Reading ", msg)
+#define pr_read_end()		pr_prefix_end()
+
+#define pr_write_start(msg)	pr_prefix_start("Writing ", msg)
+#define pr_write_end()		pr_prefix_end()
 
 #endif /* __CPT2_LOG_H__ */
