@@ -37,6 +37,64 @@ int read_timers(context_t *ctx)
 	return 0;
 }
 
+static int write_posix_timers(context_t *ctx, struct task_struct *t)
+{
+	int fd, ret = -1;
+
+	fd = open_image(ctx, CR_FD_POSIX_TIMERS, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	if (t->ti.cpt_posix_timers != CPT_NULL) {
+		union {
+			struct cpt_object_hdr		h;
+			struct cpt_posix_timer_image	v;
+		} u;
+		off_t start, end;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_POSIX_TIMER_LIST,
+				 &u.h, t->ti.cpt_posix_timers)) {
+			pr_err("Can't read posix timers list at @%li\n",
+			       (long)t->ti.cpt_posix_timers);
+			goto out;
+		}
+
+		start	= t->ti.cpt_posix_timers + u.h.cpt_hdrlen;
+		end	= t->ti.cpt_posix_timers + u.h.cpt_next;
+
+		while (start < end) {
+			PosixTimerEntry pte = POSIX_TIMER_ENTRY__INIT;
+
+			if (read_obj_cpt(ctx->fd, CPT_OBJ_POSIX_TIMER, &u.v, start)) {
+				pr_err("Can't read posix timer at @%li\n", start);
+				goto out;
+			}
+
+			pte.it_id		= u.v.cpt_timer_id;
+			pte.clock_id		= u.v.cpt_timer_clock;
+			pte.si_signo		= u.v.cpt_sigev_signo;
+			pte.it_sigev_notify	= u.v.cpt_sigev_notify;
+			pte.sival_ptr		= u.v.cpt_sigev_value;
+			pte.overrun		= u.v.cpt_timer_overrun;
+			pte.isec		= (u32)(u.v.cpt_timer_interval >> 32);
+			pte.insec		= (u32)(u.v.cpt_timer_interval & 0xffffffff);
+			pte.vsec		= (u32)(u.v.cpt_timer_value >> 32);
+			pte.vnsec		= (u32)(u.v.cpt_timer_value & 0xffffffff);
+
+			ret = pb_write_one(fd, &pte, PB_POSIX_TIMERS);
+			if (ret)
+				goto out;
+
+			start += u.v.cpt_next;
+		}
+	}
+	ret = 0;
+
+out:
+	close(fd);
+	return ret;
+}
+
 static int write_itimers(context_t *ctx, struct task_struct *t)
 {
 	int ret = -1, fd = -1;
@@ -95,9 +153,6 @@ err:
 
 int write_timers(context_t *ctx, struct task_struct *t)
 {
-	int ret;
-
-	ret = write_itimers(ctx, t);
-
-	return ret;
+	return	write_itimers(ctx, t)	|
+		write_posix_timers(ctx, t);
 }
