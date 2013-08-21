@@ -264,7 +264,6 @@ void read_fini(context_t *ctx)
 	free_ttys(ctx);
 	free_inodes(ctx);
 	free_tasks(ctx);
-	free_timers(ctx);
 	free_mm(ctx);
 	free_netdevs(ctx);
 	free_ifaddr(ctx);
@@ -321,9 +320,6 @@ int read_dumpfile(context_t *ctx)
 		return -1;
 
 	if (read_tasks(ctx))
-		return -1;
-
-	if (read_timers(ctx))
 		return -1;
 
 	if (read_mm(ctx))

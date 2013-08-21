@@ -20,23 +20,6 @@
 
 u16 image_HZ;
 
-
-/*
- * FIXME The task image refers to cpt_posix_timer_image list
- *       which is not yet covered neither in cpt2 or criu itself.
- */
-
-void free_timers(context_t *ctx)
-{
-	/* FIXME stub */
-}
-
-int read_timers(context_t *ctx)
-{
-	/* FIXME stub */
-	return 0;
-}
-
 static int write_posix_timers(context_t *ctx, struct task_struct *t)
 {
 	int fd, ret = -1;
