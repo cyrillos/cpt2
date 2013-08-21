@@ -1,6 +1,6 @@
 - Check @cpt_flags usage, especially used in fd descriptors and file descriptors
 - stubs for IPC part, completely
-- stubs for fanotify, socket queues, remap files, namespaces files (ie /proc/ns:[])
+- stubs for fanotify, remap files, namespaces files (ie /proc/ns:[])
 - sockets filters
 - netdevice, only lo supported
 - no posix timers (not yet implemented in criu)
@@ -15,7 +15,6 @@
 - sysv shared memory is not yet converted
 - criu doesn't use CPT_OBJ_LASTSIGINFO
 - is everything from CPT_OBJ_SIGNAL_STRUCT converted?
-- sas stack is not yet converted (wait until criu support it)
 
 - Note about signal queues suspend/resume: in openvz the siginfo::si_signo is
   not check tested for negative value but copies data member by member skipping
