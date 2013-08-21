@@ -73,11 +73,16 @@ static int write_inventory(context_t *ctx)
 	return ret;
 }
 
+/*
+ * There are some image files which CRIU expect to exist,
+ * but they are either not supported in OpenVZ or not yet
+ * converted. For such case simply write empty stubs.
+ */
 static int write_stubs(context_t *ctx)
 {
 	int fd;
 
-#define gen_stub(type)						\
+#define __gen_image_stub(type)					\
 	do {							\
 		fd = open_image(ctx, CR_FD_##type, O_DUMP);	\
 		if (fd < 0)					\
@@ -85,11 +90,11 @@ static int write_stubs(context_t *ctx)
 		close(fd);					\
 	} while (0)
 
-	gen_stub(FANOTIFY);
-	gen_stub(FANOTIFY_MARK);
-	gen_stub(PACKETSK);
-	gen_stub(NS_FILES);
-#undef gen_stub
+	__gen_image_stub(FANOTIFY);
+	__gen_image_stub(FANOTIFY_MARK);
+	__gen_image_stub(PACKETSK);
+	__gen_image_stub(NS_FILES);
+#undef __gen_image_stub
 
 	return 0;
 }
