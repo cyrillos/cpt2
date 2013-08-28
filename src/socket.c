@@ -426,7 +426,7 @@ int write_extern_unix(context_t *ctx)
 		ue.fown			= &fown;
 		ue.opts			= &skopts;
 
-		if (pb_write_one(fd, &ue, PB_UNIXSK))
+		if (pb_write_one(fd, &ue, PB_UNIX_SK))
 			return -1;
 	}
 
@@ -551,7 +551,7 @@ static int write_unix_socket(context_t *ctx, struct file_struct *file, struct so
 	 * FIXME No socket filters on cpt image
 	 */
 
-	ret = pb_write_one(fd, &ue, PB_UNIXSK);
+	ret = pb_write_one(fd, &ue, PB_UNIX_SK);
 
 	if (!ret) {
 		file->dumped = true;
@@ -867,7 +867,7 @@ static int write_inet_socket(context_t *ctx, struct file_struct *file, struct so
 		}
 	}
 
-	ret = pb_write_one(fd, &ie, PB_INETSK);
+	ret = pb_write_one(fd, &ie, PB_INET_SK);
 	if (!ret) {
 		if (sk->si.cpt_protocol == IPPROTO_TCP &&
 		    sk->si.cpt_state == TCP_ESTABLISHED)
@@ -890,7 +890,7 @@ static int write_netlink_socket(context_t *ctx,
 	SkOptsEntry skopts = SK_OPTS_ENTRY__INIT;
 	FownEntry fown = FOWN_ENTRY__INIT;
 
-	int fd = fdset_fd(ctx->fdset_glob, CR_FD_NETLINKSK);
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_NETLINK_SK);
 	int ret = -1;
 
 	if (file->dumped)
@@ -914,7 +914,7 @@ static int write_netlink_socket(context_t *ctx,
 	if (fill_socket_opts(ctx, sk, &skopts))
 		return -1;
 
-	ret = pb_write_one(fd, &ne, PB_NETLINKSK);
+	ret = pb_write_one(fd, &ne, PB_NETLINK_SK);
 
 	pr_warn_once("Netlink sockets are not supported.\n"
 		     "You probably fail on restore\n");

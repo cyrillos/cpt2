@@ -64,7 +64,7 @@ static int write_posix_timers(context_t *ctx, struct task_struct *t)
 			pte.vsec		= (u32)(u.v.cpt_timer_value >> 32);
 			pte.vnsec		= (u32)(u.v.cpt_timer_value & 0xffffffff);
 
-			ret = pb_write_one(fd, &pte, PB_POSIX_TIMERS);
+			ret = pb_write_one(fd, &pte, PB_POSIX_TIMER);
 			if (ret)
 				goto out;
 
@@ -98,7 +98,7 @@ static int write_itimers(context_t *ctx, struct task_struct *t)
 	ie.iusec	= tv.it_interval.tv_usec;
 	ie.vsec		= tv.it_value.tv_sec;
 	ie.vusec	= tv.it_value.tv_usec;
-	ret = pb_write_one(fd, &ie, PB_ITIMERS);
+	ret = pb_write_one(fd, &ie, PB_ITIMER);
 	if (ret)
 		goto err;
 
@@ -112,7 +112,7 @@ static int write_itimers(context_t *ctx, struct task_struct *t)
 	ie.iusec	= tv.it_interval.tv_usec;
 	ie.vsec		= tv.it_value.tv_sec;
 	ie.vusec	= tv.it_value.tv_usec;
-	ret = pb_write_one(fd, &ie, PB_ITIMERS);
+	ret = pb_write_one(fd, &ie, PB_ITIMER);
 	if (ret)
 		goto err;
 
@@ -126,7 +126,7 @@ static int write_itimers(context_t *ctx, struct task_struct *t)
 	ie.iusec	= tv.it_interval.tv_usec;
 	ie.vsec		= tv.it_value.tv_sec;
 	ie.vusec	= tv.it_value.tv_usec;
-	ret = pb_write_one(fd, &ie, PB_ITIMERS);
+	ret = pb_write_one(fd, &ie, PB_ITIMER);
 	if (ret)
 		goto err;
 err:

@@ -492,7 +492,7 @@ static int write_task_ipc(context_t *ctx, struct task_struct *t)
 	int fd_ipc_var = -1, fd_ipc_shm = -1;
 	int fd_ipc_msg = -1, fd_ipc_sem = -1;
 
-	fd_ipc_var = open_image(ctx, CR_FD_IPCNS_VAR, O_DUMP, t->ti.cpt_pid);
+	fd_ipc_var = open_image(ctx, CR_FD_IPC_VAR, O_DUMP, t->ti.cpt_pid);
 	if (fd_ipc_var < 0)
 		goto out;
 	fd_ipc_shm = open_image(ctx, CR_FD_IPCNS_SHM, O_DUMP, t->ti.cpt_pid);

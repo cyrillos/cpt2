@@ -123,7 +123,7 @@ static int tty_gen_id(int major, int index)
 
 int write_tty_entry(context_t *ctx, struct file_struct *file)
 {
-	int fd = fdset_fd(ctx->fdset_glob, CR_FD_TTY);
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_TTY_FILES);
 	struct inode_struct *inode;
 	struct tty_struct *tty;
 
@@ -157,7 +157,7 @@ int write_tty_entry(context_t *ctx, struct file_struct *file)
 
 	ret = write_tty_info_entry(ctx, e.tty_info_id, file, inode, tty);
 	if (!ret) {
-		ret = pb_write_one(fd, &e, PB_TTY);
+		ret = pb_write_one(fd, &e, PB_TTY_FILE);
 		if (!ret)
 			file->dumped = 1;
 	}

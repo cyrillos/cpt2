@@ -77,7 +77,7 @@ static int getfstype(struct vfsmnt_struct *v)
 
 static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 {
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_MOUNTPOINTS);
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_MNTS);
 	struct vfsmnt_struct *v;
 	struct ns_struct *ns;
 	MntEntry e;
@@ -104,7 +104,7 @@ static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
 		e.source		= v->mnt_dev;
 		e.options		= NULL;
 
-		if (pb_write_one(fd, &e, PB_MOUNTPOINTS))
+		if (pb_write_one(fd, &e, PB_MNT))
 			return -1;
 	}
 

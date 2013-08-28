@@ -76,7 +76,7 @@ err:
 
 int write_epoll(context_t *ctx, struct file_struct *file)
 {
-	int fd = fdset_fd(ctx->fdset_glob, CR_FD_EVENTPOLL);
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_EVENTPOLL_FILE);
 	EventpollFileEntry e = EVENTPOLL_FILE_ENTRY__INIT;
 	FownEntry fown = FOWN_ENTRY__INIT;
 	struct epoll_struct *epoll;
@@ -94,7 +94,7 @@ int write_epoll(context_t *ctx, struct file_struct *file)
 	e.flags		= file->fi.cpt_flags;
 	e.fown		= (FownEntry *)&fown;
 
-	ret = pb_write_one(fd, &e, PB_EVENTPOLL);
+	ret = pb_write_one(fd, &e, PB_EVENTPOLL_FILE);
 	if (!ret) {
 		ret = write_epoll_tfds(ctx, file, epoll);
 		file->dumped = 1;

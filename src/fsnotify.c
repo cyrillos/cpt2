@@ -123,7 +123,7 @@ int write_inotify(context_t *ctx, struct file_struct *file)
 	InotifyFileEntry ie = INOTIFY_FILE_ENTRY__INIT;
 	FownEntry fown = FOWN_ENTRY__INIT;
 
-	int fd = fdset_fd(ctx->fdset_glob, CR_FD_INOTIFY);
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_INOTIFY_FILE);
 	struct inotify_struct *inotify;
 	int ret = -1;
 
@@ -145,7 +145,7 @@ int write_inotify(context_t *ctx, struct file_struct *file)
 
 	ret = write_inotify_fdinfo(ctx, file, inotify);
 	if (!ret) {
-		ret = pb_write_one(fd, &ie, PB_INOTIFY);
+		ret = pb_write_one(fd, &ie, PB_INOTIFY_FILE);
 		if (!ret)
 			file->dumped = true;
 	}

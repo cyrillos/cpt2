@@ -90,7 +90,7 @@ static int write_stubs(context_t *ctx)
 		close(fd);					\
 	} while (0)
 
-	__gen_image_stub(FANOTIFY);
+	__gen_image_stub(FANOTIFY_FILE);
 	__gen_image_stub(FANOTIFY_MARK);
 	__gen_image_stub(PACKETSK);
 	__gen_image_stub(NS_FILES);

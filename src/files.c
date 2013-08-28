@@ -292,7 +292,7 @@ static int dump_remaped_file(context_t *ctx, struct file_struct *file,
 		rfe.fown	= &fown;
 		rfe.name	= _link ? _link : name;
 
-		ret = pb_write_one(regfile_fd, &rfe, PB_REG_FILES);
+		ret = pb_write_one(regfile_fd, &rfe, PB_REG_FILE);
 		xfree(name);
 
 		if (ret)
@@ -520,7 +520,7 @@ int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 	rfe.fown	= &fown;
 	rfe.name	= demangle_deleted(file->name);
 
-	ret = pb_write_one(rfd, &rfe, PB_REG_FILES);
+	ret = pb_write_one(rfd, &rfe, PB_REG_FILE);
 	if (!ret)
 		file->dumped = true;
 
@@ -579,7 +579,7 @@ static int write_pipe_data(context_t *ctx, struct file_struct *file,
 	pde.bytes	= u.bits.cpt_size;
 	pde.has_size	= false;
 
-	if (pb_write_one(fd, &pde, PB_PIPES_DATA)) {
+	if (pb_write_one(fd, &pde, PB_PIPE_DATA)) {
 		pr_err("Can't write pde to image\n");
 		return -1;
 	}
@@ -628,7 +628,7 @@ static int write_pipe_entry(context_t *ctx, struct file_struct *file)
 	pe.flags	= file->fi.cpt_flags;
 	pe.fown		= &fown;
 
-	ret = pb_write_one(fd, &pe, PB_PIPES);
+	ret = pb_write_one(fd, &pe, PB_PIPE);
 	if (!ret) {
 		ret = write_pipe_data(ctx, file, inode, true);
 		if (!ret)
@@ -706,7 +706,7 @@ static int write_signalfd(context_t *ctx, struct file_struct *file)
 
 static int write_eventfd(context_t *ctx, struct file_struct *file)
 {
-	int fd = fdset_fd(ctx->fdset_glob, CR_FD_EVENTFD);
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_EVENTFD_FILE);
 	EventfdFileEntry e = EVENTFD_FILE_ENTRY__INIT;
 	FownEntry fown = FOWN_ENTRY__INIT;
 	int ret = -1;
@@ -723,7 +723,7 @@ static int write_eventfd(context_t *ctx, struct file_struct *file)
 	e.fown		= &fown;
 	e.counter	= file->sprig->u.efi.cpt_count;
 
-	ret = pb_write_one(fd, &e, PB_EVENTFD);
+	ret = pb_write_one(fd, &e, PB_EVENTFD_FILE);
 	if (!ret)
 		file->dumped = true;
 

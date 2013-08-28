@@ -575,7 +575,7 @@ static int write_file_map(context_t *ctx, pid_t pid, struct vma_struct *vma)
 	else
 		rfe.flags = O_RDONLY;
 
-	ret = pb_write_one(rfd, &rfe, PB_REG_FILES);
+	ret = pb_write_one(rfd, &rfe, PB_REG_FILE);
 	if (!ret)
 		vma->file->dumped = 1;
 
@@ -639,7 +639,7 @@ int write_vmas(context_t *ctx, pid_t pid, off_t cpt_mm)
 			goto err;
 		}
 
-		if (pb_write_one(fd_vmas, &e, PB_VMAS)) {
+		if (pb_write_one(fd_vmas, &e, PB_VMA)) {
 			pr_err("Can't write VMA at @%li\n", obj_pos_of(vma));
 			goto err;
 		}
