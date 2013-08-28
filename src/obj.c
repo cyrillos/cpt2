@@ -206,12 +206,24 @@ static void obj_reset(obj_t *obj, size_t size)
 	obj->o_image	= obj->__payload;
 }
 
-obj_t *obj_alloc(size_t size)
+static obj_t *__obj_alloc(size_t size, bool zeroify)
 {
-	obj_t *obj = xmalloc(sizeof(*obj) + size);
+	obj_t *obj = zeroify ?
+		xzalloc(sizeof(*obj) + size) :
+		xmalloc(sizeof(*obj) + size);
 	if (obj)
 		obj_reset(obj, size);
 	return obj;
+}
+
+obj_t *obj_alloc(size_t size)
+{
+	return __obj_alloc(size, false);
+}
+
+obj_t *obj_zalloc(size_t size)
+{
+	return __obj_alloc(size, true);
 }
 
 void obj_free(obj_t *obj)

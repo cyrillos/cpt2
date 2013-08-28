@@ -46,6 +46,7 @@ extern void obj_push(obj_t *obj, int objtype);
 extern obj_t *pop_obj(int objtype);
 
 extern obj_t *obj_alloc(size_t size);
+extern obj_t *obj_zalloc(size_t size);
 extern void obj_free(obj_t *obj);
 extern void obj_free_safe(obj_t **obj);
 
