@@ -1052,7 +1052,7 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 			pr_debug("\n\t\t\t --> ");
 			for (i = 0; i < len; i++)
 				pr_debug("%c", isprint(src[i]) ? src[i] : '.');
-		} else if (family == PF_INET || PF_INET6) {
+		} else if (family == PF_INET || family == PF_INET6) {
 			char buf[INET_ADDRSTRLEN];
 
 			pr_debug("\t\t\t --> %s",
