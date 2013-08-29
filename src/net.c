@@ -22,6 +22,7 @@
 #include "hashtable.h"
 #include "xmalloc.h"
 #include "socket.h"
+#include "string.h"
 #include "image.h"
 #include "mslab.h"
 #include "read.h"
@@ -46,6 +47,25 @@ static DEFINE_HASHTABLE(netdev_hash, NET_HASH_BITS);
 
 static LIST_HEAD(netdev_list);
 static LIST_HEAD(ifaddr_list);
+
+char *vprintip(int family, void *addr, char *buf, size_t size)
+{
+	if (!addr || !buf || size < 1)
+		return NULL;
+
+	switch (family) {
+	case PF_INET:
+		inet_ntop(PF_INET, addr, buf, size);
+		break;
+	case PF_INET6:
+		inet_ntop(PF_INET6, addr, buf, size);
+		break;
+	default:
+		strlcpy(buf, "@unknown", size);
+		break;
+	}
+	return buf;
+}
 
 struct netdev_struct *netdev_lookup(u32 cpt_index)
 {
@@ -388,11 +408,27 @@ int write_ifaddr(context_t *ctx)
 
 static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
 {
+	char buf[max(INET_ADDRSTRLEN, INET6_ADDRSTRLEN)];
+	void *addr = NULL, *peer = NULL;
+
 	pr_debug("\t@%-10li index %#8x family %8s masklen %#1x "
 		 "flags %#1x scope %#1x -> %s\n", obj_pos_of(ifa),
 		 ifa->ii.cpt_index, sock_proto_family(ifa->ii.cpt_family),
 		 (int)ifa->ii.cpt_masklen, (int)ifa->ii.cpt_flags,
 		 (int)ifa->ii.cpt_scope, (char *)ifa->ii.cpt_label);
+
+	switch (ifa->ii.cpt_family) {
+	case PF_INET:
+		addr = (void *)&((struct sockaddr_in *)ifa->ii.cpt_address)->sin_addr;
+		peer = (void *)&((struct sockaddr_in *)ifa->ii.cpt_peer)->sin_addr;
+		break;
+	case PF_INET6:
+		addr = (void *)&((struct sockaddr_in6 *)ifa->ii.cpt_address)->sin6_addr;
+		peer = (void *)&((struct sockaddr_in6 *)ifa->ii.cpt_peer)->sin6_addr;
+		break;
+	}
+	pr_debug("\t\t\taddress --> %s\n", vprintip(ifa->ii.cpt_family, addr, buf, sizeof(buf)));
+	pr_debug("\t\t\tpeer    --> %s\n", vprintip(ifa->ii.cpt_family, peer, buf, sizeof(buf)));
 }
 
 int read_ifaddr(context_t *ctx)
