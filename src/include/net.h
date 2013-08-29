@@ -16,6 +16,15 @@ struct netdev_struct {
 
 	struct cpt_netdev_image		ni;
 	struct cpt_hwaddr_image		hwi;
+	struct cpt_netstats_image	nsi;
+
+	int				utype;
+	union {
+		struct cpt_veth_image	vti;
+		struct cpt_tuntap_image	tti;
+		struct cpt_tunnel_image	tli;
+		struct cpt_br_image	bri;
+	} u;
 };
 
 struct ifaddr_struct {

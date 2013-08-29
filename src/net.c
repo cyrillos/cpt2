@@ -196,6 +196,71 @@ static void show_netdev_cont(context_t *ctx, struct netdev_struct *dev)
 	for (i = 0; i < sizeof(dev->hwi.cpt_dev_addr) - 2; i++)
 		pr_debug("%x:", (int)dev->hwi.cpt_dev_addr[i]);
 	pr_debug("%x\n", (int)dev->hwi.cpt_dev_addr[i]);
+
+	switch (dev->utype) {
+	case CPT_OBJ_NET_TUNTAP:
+		pr_debug("\t\ttun/tap: owner #%8x flags %#-8lx bindfile @%li\n"
+			 "\t\t         if_flags %#-8lx cpt_dev_addr %x-%x-%x-%x-%x-%x\n",
+			dev->u.tti.cpt_owner, (long)dev->u.tti.cpt_flags,
+			(long)dev->u.tti.cpt_bindfile, (long)dev->u.tti.cpt_if_flags,
+			dev->u.tti.cpt_dev_addr[0], dev->u.tti.cpt_dev_addr[1],
+			dev->u.tti.cpt_dev_addr[2], dev->u.tti.cpt_dev_addr[3],
+			dev->u.tti.cpt_dev_addr[4], dev->u.tti.cpt_dev_addr[5]);
+		break;
+	}
+}
+
+static int read_netdev_payload(context_t *ctx, struct netdev_struct *dev, off_t start, off_t end)
+{
+	struct cpt_object_hdr hdr = { };
+
+	for (; start < end; start += hdr.cpt_next) {
+		if (read_obj_hdr(ctx->fd, &hdr, start)) {
+			pr_err("Can't read header at @%li\n", (long)start);
+			return -1;
+		}
+
+		switch (hdr.cpt_object) {
+		case CPT_OBJ_NET_HWADDR:
+			memcpy((void *)&dev->hwi, &hdr, sizeof(hdr));
+			if (read_obj_cont(ctx->fd, &dev->hwi))
+				goto cont_failed;
+			break;
+		case CPT_OBJ_NET_TUNTAP:
+			memcpy((void *)&dev->u.tti, &hdr, sizeof(hdr));
+			if (read_obj_cont(ctx->fd, &dev->u.tti))
+				goto cont_failed;
+			dev->utype = hdr.cpt_object;
+			if (dev->u.tti.cpt_next > dev->u.tti.cpt_hdrlen) {
+				/*
+				 * FIXME Here might be CPT_OBJ_NET_TAP_FILTER.
+				 * We don't support it in criu yet but ignore
+				 * here for a while.
+				 */
+				pr_debug("TUN/TAP filter detected at @%li, ignoring\n",
+					 (long)start);
+			}
+			break;
+		case CPT_OBJ_NET_STATS:
+		case CPT_OBJ_NET_IPIP_TUNNEL:
+		case CPT_OBJ_NET_BR:
+			/*
+			 * We don't support this objects yet,
+			 * so skip them for a while.
+			 */
+			break;
+		default:
+			pr_err("Bad object %s at @%li\n",
+			       obj_name(hdr.cpt_object), (long)start);
+			return -1;
+		}
+	}
+
+	return 0;
+
+cont_failed:
+	pr_err("Can't read object at @%li\n", (long)start);
+	return -1;
 }
 
 int read_netdevs(context_t *ctx)
@@ -212,26 +277,16 @@ int read_netdevs(context_t *ctx)
 		if (!dev)
 			return -1;
 
-		/*
-		 * Netdevice is stored as an array of objects,
-		 * where netdev comes first, then mac address,
-		 * and finally -- device statistics. Since we
-		 * don't deal with statistics, we simply skip
-		 * it.
-		 */
-
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_NET_DEVICE, &dev->ni, start)) {
 			obj_free_to(dev);
 			pr_err("Can't read netdev object at @%li\n", (long)start);
 			return -1;
 		}
 
-		if (read_obj_cpt(ctx->fd, CPT_OBJ_NET_HWADDR, &dev->hwi,
-				 start + dev->ni.cpt_hdrlen)) {
-			obj_free_to(dev);
-			pr_err("Can't read netdev object at @%li\n", (long)start);
-			return -1;
-		}
+		memzero(&dev->u, sizeof(dev->u));
+		memzero(&dev->hwi, sizeof(dev->hwi));
+		memzero(&dev->nsi, sizeof(dev->nsi));
+		dev->utype = OBJ_ANY;
 
 		INIT_LIST_HEAD(&dev->list);
 		INIT_HLIST_NODE(&dev->hash);
@@ -241,12 +296,17 @@ int read_netdevs(context_t *ctx)
 		list_add_tail(&dev->list, &netdev_list);
 
 		obj_hash_typed_to(dev, CPT_OBJ_NET_DEVICE, start);
+
+		if (read_netdev_payload(ctx, dev, start + dev->ni.cpt_hdrlen,
+					start + dev->ni.cpt_next)) {
+			obj_free_to(dev);
+			pr_err("Can't read netdev object payload at @%li\n",
+			       (long)start);
+			return -1;
+		}
+
 		start += dev->ni.cpt_next;
 
-		/*
-		 * Here might be device statistics, just skip
-		 * it since we don't deal with it anyway.
-		 */
 		show_netdev_cont(ctx, dev);
 	}
 	pr_read_end();
