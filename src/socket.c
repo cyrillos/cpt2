@@ -1038,6 +1038,7 @@ unknown_obj:
 static void show_sock_addr(const char *prefix, int family, char *src, size_t len)
 {
 	if (len) {
+		char buf[max(INET_ADDRSTRLEN, INET6_ADDRSTRLEN)];
 		unsigned int i;
 
 		pr_debug("\t\t\t%10s (%u)\n\t\t\t", prefix, (unsigned int)len);
@@ -1053,17 +1054,13 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 			for (i = 0; i < len; i++)
 				pr_debug("%c", isprint(src[i]) ? src[i] : '.');
 		} else if (family == PF_INET || family == PF_INET6) {
-			char buf[INET_ADDRSTRLEN];
-
-			pr_debug("\t\t\t --> %s",
-				 inet_ntop(PF_INET, (void *)&((struct sockaddr_in *)src)->sin_addr,
-					   buf, sizeof(buf)));
+			pr_debug("\t\t\t --> %s\n",
+				 vprintip(family, (void *)&((struct sockaddr_in *)src)->sin_addr,
+					  buf, sizeof(buf)));
 		} else if (family == PF_INET6) {
-			char buf[INET6_ADDRSTRLEN];
-
-			pr_debug("\t\t\t --> %s",
-				 inet_ntop(PF_INET6, (void *)&((struct sockaddr_in6 *)src)->sin6_addr,
-					   buf, sizeof(buf)));
+			pr_debug("\t\t\t --> %s\n",
+				 vprintip(family, (void *)&((struct sockaddr_in6 *)src)->sin6_addr,
+					  buf, sizeof(buf)));
 		}
 		pr_debug("\n");
 	}
