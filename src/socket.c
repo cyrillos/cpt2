@@ -32,6 +32,7 @@
 #include "mslab.h"
 #include "read.h"
 #include "task.h"
+#include "util.h"
 #include "net.h"
 #include "log.h"
 #include "obj.h"
@@ -1039,13 +1040,15 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 {
 	if (len) {
 		char buf[max(INET_ADDRSTRLEN, INET6_ADDRSTRLEN)];
+		char hexbuf[128];
 		unsigned int i;
 
 		pr_debug("\t\t\t%10s (%u)\n\t\t\t", prefix, (unsigned int)len);
 
-		for (i = 0; i < len; i++) {
-			pr_debug("0x%02x:", (unsigned char)src[i]);
-			if (!((i + 1) % 8))
+		vprinthex(hexbuf, sizeof(hexbuf), src, len);
+		for (i = 0; hexbuf[i]; i += 2) {
+			pr_debug("%c%c:", hexbuf[i + 0], hexbuf[i + 1]);
+			if (((i + 2) % 16) == 0 && hexbuf[i + 2])
 				pr_debug("\n\t\t\t");
 		}
 
@@ -1054,7 +1057,7 @@ static void show_sock_addr(const char *prefix, int family, char *src, size_t len
 			for (i = 0; i < len; i++)
 				pr_debug("%c", isprint(src[i]) ? src[i] : '.');
 		} else if (family == PF_INET || family == PF_INET6) {
-			pr_debug("\t\t\t --> %s\n", vprintip(family, src, buf, sizeof(buf)));
+			pr_debug("\n\t\t\t --> %s", vprintip(family, src, buf, sizeof(buf)));
 		}
 		pr_debug("\n");
 	}

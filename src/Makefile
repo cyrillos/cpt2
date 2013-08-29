@@ -21,6 +21,7 @@ obj-y	+= epoll.o
 obj-y	+= libnetlink.o
 obj-y	+= timers.o
 obj-y	+= socket.o
+obj-y	+= util.o
 
 cflags-y += -iquote include
 

@@ -27,6 +27,7 @@
 #include "mslab.h"
 #include "read.h"
 #include "task.h"
+#include "util.h"
 #include "net.h"
 #include "log.h"
 #include "obj.h"
@@ -47,25 +48,6 @@ static DEFINE_HASHTABLE(netdev_hash, NET_HASH_BITS);
 
 static LIST_HEAD(netdev_list);
 static LIST_HEAD(ifaddr_list);
-
-char *vprintip(int family, void *addr, char *buf, size_t size)
-{
-	if (!addr || !buf || size < 1)
-		return NULL;
-
-	switch (family) {
-	case PF_INET:
-		inet_ntop(PF_INET, (void *)&((struct sockaddr_in *)addr)->sin_addr, buf, size);
-		break;
-	case PF_INET6:
-		inet_ntop(PF_INET6, (void *)&((struct sockaddr_in6 *)addr)->sin6_addr, buf, size);
-		break;
-	default:
-		strlcpy(buf, "@unknown", size);
-		break;
-	}
-	return buf;
-}
 
 struct netdev_struct *netdev_lookup(u32 cpt_index)
 {
@@ -206,26 +188,32 @@ int write_netdevs(context_t *ctx)
 
 static void show_netdev_cont(context_t *ctx, struct netdev_struct *dev)
 {
+	char hexbuf[128];
 	unsigned int i;
 
 	pr_debug("\t@%-10li index %#8x flags %#8x mtu %#8x -> %s\n",
 		 obj_pos_of(dev), dev->ni.cpt_index,
 		 dev->ni.cpt_flags, dev->ni.cpt_mtu, dev->ni.cpt_name);
 
-	pr_debug("\t\tmac: ");
-	for (i = 0; i < sizeof(dev->hwi.cpt_dev_addr) - 2; i++)
-		pr_debug("%x:", (int)dev->hwi.cpt_dev_addr[i]);
-	pr_debug("%x\n", (int)dev->hwi.cpt_dev_addr[i]);
+	pr_debug("\t\tmac:\n\t\t");
+	vprinthex(hexbuf, sizeof(hexbuf), dev->hwi.cpt_dev_addr, sizeof(dev->hwi.cpt_dev_addr));
+	for (i = 0; hexbuf[i]; i += 2) {
+		pr_debug("%c%c:", hexbuf[i + 0], hexbuf[i + 1]);
+		if (((i + 2) % 16) == 0 && hexbuf[i + 2])
+			pr_debug("\n\t\t");
+	}
+	pr_debug("\n");
 
 	switch (dev->utype) {
 	case CPT_OBJ_NET_TUNTAP:
+		vprinthex(hexbuf, sizeof(hexbuf), dev->u.tti.cpt_dev_addr, sizeof(dev->u.tti.cpt_dev_addr));
 		pr_debug("\t\ttun/tap: owner #%8x flags %#-8lx bindfile @%li\n"
-			 "\t\t         if_flags %#-8lx cpt_dev_addr %x-%x-%x-%x-%x-%x\n",
-			dev->u.tti.cpt_owner, (long)dev->u.tti.cpt_flags,
-			(long)dev->u.tti.cpt_bindfile, (long)dev->u.tti.cpt_if_flags,
-			dev->u.tti.cpt_dev_addr[0], dev->u.tti.cpt_dev_addr[1],
-			dev->u.tti.cpt_dev_addr[2], dev->u.tti.cpt_dev_addr[3],
-			dev->u.tti.cpt_dev_addr[4], dev->u.tti.cpt_dev_addr[5]);
+			 "\t\t         if_flags %#-8lx cpt_dev_addr ",
+			 dev->u.tti.cpt_owner, (long)dev->u.tti.cpt_flags,
+			 (long)dev->u.tti.cpt_bindfile, (long)dev->u.tti.cpt_if_flags);
+		for (i = 0; hexbuf[i]; i += 2)
+			pr_debug("%c%c:", hexbuf[i + 0], hexbuf[i + 1]);
+		pr_debug("\n");
 		break;
 	}
 }
@@ -409,15 +397,33 @@ int write_ifaddr(context_t *ctx)
 static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
 {
 	char buf[max(INET_ADDRSTRLEN, INET6_ADDRSTRLEN)];
+	char hexbuf[128];
+	unsigned int i;
 
 	pr_debug("\t@%-10li index %#8x family %8s masklen %#1x "
-		 "flags %#1x scope %#1x -> %s\n", obj_pos_of(ifa),
+		 "flags %#1x scope %#1x -> %s", obj_pos_of(ifa),
 		 ifa->ii.cpt_index, sock_proto_family(ifa->ii.cpt_family),
 		 (int)ifa->ii.cpt_masklen, (int)ifa->ii.cpt_flags,
 		 (int)ifa->ii.cpt_scope, (char *)ifa->ii.cpt_label);
 
-	pr_debug("\t\t\taddress --> %s\n", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_address, buf, sizeof(buf)));
-	pr_debug("\t\t\tpeer    --> %s\n", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_peer, buf, sizeof(buf)));
+	vprinthex(hexbuf, sizeof(hexbuf), ifa->ii.cpt_address, sizeof(ifa->ii.cpt_address));
+	pr_debug("\n\t\t\t");
+	for (i = 0; hexbuf[i]; i += 2) {
+		pr_debug("%c%c:", hexbuf[i + 0], hexbuf[i + 1]);
+		if (((i + 2) % 16) == 0 && hexbuf[i + 2])
+			pr_debug("\n\t\t\t");
+	}
+	pr_debug("\n\t\t\t\taddress --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_address, buf, sizeof(buf)));
+
+	vprinthex(hexbuf, sizeof(hexbuf), ifa->ii.cpt_peer, sizeof(ifa->ii.cpt_peer));
+	pr_debug("\n\t\t\t");
+	for (i = 0; hexbuf[i]; i += 2) {
+		pr_debug("%c%c:", hexbuf[i + 0], hexbuf[i + 1]);
+		if (((i + 2) % 16) == 0 && hexbuf[i + 2])
+			pr_debug("\n\t\t\t");
+	}
+	pr_debug("\n\t\t\t\tpeer    --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_peer, buf, sizeof(buf)));
+	pr_debug("\n");
 }
 
 int read_ifaddr(context_t *ctx)

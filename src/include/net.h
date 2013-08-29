@@ -43,6 +43,4 @@ extern int write_ifaddr(context_t *ctx);
 extern void free_ifaddr(context_t *ctx);
 extern int write_routes(context_t *ctx);
 
-extern char *vprintip(int family, void *addr, char *buf, size_t size);
-
 #endif /* __CPT2_NET_H__ */
