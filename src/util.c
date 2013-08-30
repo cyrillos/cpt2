@@ -19,16 +19,34 @@ char *vprintip(int family, void *addr, char *buf, size_t size)
 
 	switch (family) {
 	case PF_INET:
-		inet_ntop(PF_INET, (void *)&((struct sockaddr_in *)addr)->sin_addr, buf, size);
+		inet_ntop(PF_INET, (void *)addr, buf, size);
 		break;
 	case PF_INET6:
-		inet_ntop(PF_INET6, (void *)&((struct sockaddr_in6 *)addr)->sin6_addr, buf, size);
+		inet_ntop(PF_INET6, (void *)addr, buf, size);
 		break;
 	default:
 		strlcpy(buf, "@unknown", size);
 		break;
 	}
 	return buf;
+}
+
+char *vprintip_sin(int family, void *addr, char *buf, size_t size)
+{
+	void *from = NULL;
+
+	if (!addr || !buf || size < 1)
+		return NULL;
+
+	switch (family) {
+	case PF_INET:
+		from = &((struct sockaddr_in *)addr)->sin_addr;
+		break;
+	case PF_INET6:
+		from = &((struct sockaddr_in6 *)addr)->sin6_addr;
+		break;
+	}
+	return vprintip(family, from, buf, size);
 }
 
 char *vprinthex(char *dst, size_t size, void *src, size_t len)

@@ -413,7 +413,7 @@ static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
 		if (((i + 2) % 16) == 0 && hexbuf[i + 2])
 			pr_debug("\n\t\t\t");
 	}
-	pr_debug("\n\t\t\t\taddress --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_address, buf, sizeof(buf)));
+	pr_debug("\n\t\t\t\taddress   --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_address, buf, sizeof(buf)));
 
 	vprinthex(hexbuf, sizeof(hexbuf), ifa->ii.cpt_peer, sizeof(ifa->ii.cpt_peer));
 	pr_debug("\n\t\t\t");
@@ -422,7 +422,16 @@ static void show_ifaddr_cont(context_t *ctx, struct ifaddr_struct *ifa)
 		if (((i + 2) % 16) == 0 && hexbuf[i + 2])
 			pr_debug("\n\t\t\t");
 	}
-	pr_debug("\n\t\t\t\tpeer    --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_peer, buf, sizeof(buf)));
+	pr_debug("\n\t\t\t\tpeer      --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_peer, buf, sizeof(buf)));
+
+	vprinthex(hexbuf, sizeof(hexbuf), ifa->ii.cpt_broadcast, sizeof(ifa->ii.cpt_broadcast));
+	pr_debug("\n\t\t\t");
+	for (i = 0; hexbuf[i]; i += 2) {
+		pr_debug("%c%c:", hexbuf[i + 0], hexbuf[i + 1]);
+		if (((i + 2) % 16) == 0 && hexbuf[i + 2])
+			pr_debug("\n\t\t\t");
+	}
+	pr_debug("\n\t\t\t\tbroadcast --> %s", vprintip(ifa->ii.cpt_family, ifa->ii.cpt_broadcast, buf, sizeof(buf)));
 	pr_debug("\n");
 }
 
