@@ -146,6 +146,10 @@ static int get_file_type(FdinfoEntry *e, struct file_struct *file)
 	return -1;
 }
 
+#ifndef TUN_MINOR
+# define TUN_MINOR 200
+#endif
+
 static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 			   struct inode_struct *inode)
 {
@@ -201,9 +205,22 @@ static int set_fdinfo_type(FdinfoEntry *e, struct file_struct *file,
 		case UNIX98_PTY_SLAVE_MAJOR:
 			e->type = FD_TYPES__TTY;
 			break;
+		case MISC_MAJOR:
+			switch (kdev_minor(inode->ii.cpt_rdev)) {
+			case TUN_MINOR:
+				e->type = FD_TYPES__TUN;
+				break;
+			default:
+				goto minor_unknown;
+				break;
+			}
+			break;
 		default:
-			pr_err("Character file with maj %d inode at @%li\n",
-			       major(inode->ii.cpt_rdev), obj_pos_of(file));
+minor_unknown:
+			pr_err("Character file with maj %d min %d inode at @%li\n",
+			       (int)kdev_major(inode->ii.cpt_rdev),
+			       (int)kdev_minor(inode->ii.cpt_rdev),
+			       obj_pos_of(file));
 			return -1;
 		}
 	} else if (S_ISDIR(file->fi.cpt_i_mode)) {
@@ -842,6 +859,7 @@ int write_task_files(context_t *ctx, struct task_struct *t)
 
 		switch (e.type) {
 		case FD_TYPES__REG:
+		case FD_TYPES__TUN:
 			ret = write_reg_file_entry(ctx, file);
 			break;
 		case FD_TYPES__PIPE:
