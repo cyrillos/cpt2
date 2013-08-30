@@ -169,7 +169,7 @@ static int write_tundev(context_t *ctx, struct netdev_struct *dev)
 	 * FIXME These are not in cpt image :(
 	 */
 	tfe.has_detached	= true;
-	tfe.detached		= true;
+	tfe.detached		= false;
 
 	return pb_write_one(fd, &tfe, PB_TUNFILE);
 }
@@ -210,7 +210,7 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 		 */
 
 		netdev.tun	= &tun;
-		tun.flags	= dev->u.tti.cpt_if_flags;
+		tun.flags	= dev->u.tti.cpt_flags;
 		tun.owner	= dev->u.tti.cpt_owner;
 		break;
 	}
