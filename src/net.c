@@ -157,6 +157,8 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 		netdev.type = ND_TYPE__LOOPBACK;
 	else if (!strncmp((char *)dev->ni.cpt_name, "veth", 4))
 		netdev.type = ND_TYPE__VETH;
+	else if (!strncmp((char *)dev->ni.cpt_name, "tun", 3))
+		netdev.type = ND_TYPE__TUN;
 	else if (!strncmp((char *)dev->ni.cpt_name, "venet", 5)) {
 		pr_info("Netdevice `%s' detected, ignore\n", dev->ni.cpt_name);
 		return 0;
