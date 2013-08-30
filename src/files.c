@@ -533,7 +533,7 @@ int write_reg_file_entry(context_t *ctx, struct file_struct *file)
 
 	rfe.id		= obj_id_of(file);
 	rfe.flags	= file->fi.cpt_flags;
-	rfe.pos		= file->fi.cpt_pos;
+	rfe.pos		= file->fi.cpt_pos ? : -1ULL;
 	rfe.fown	= &fown;
 	rfe.name	= demangle_deleted(file->name);
 
