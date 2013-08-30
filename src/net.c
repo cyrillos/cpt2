@@ -34,6 +34,7 @@
 
 #include "protobuf.h"
 #include "protobuf/netdev.pb-c.h"
+#include "protobuf/tun.pb-c.h"
 
 /*
  * Magic numbers from iproute2 source code.
@@ -148,10 +149,37 @@ void free_netdevs(context_t *ctx)
 	}
 }
 
+static int write_tundev(context_t *ctx, struct netdev_struct *dev)
+{
+	int fd = fdset_fd(ctx->fdset_glob, CR_FD_TUNFILE);
+	TunfileEntry tfe = TUNFILE_ENTRY__INIT;
+	struct file_struct *file;
+
+	file = obj_lookup_to(CPT_OBJ_FILE, dev->u.tti.cpt_bindfile);
+	if (!file) {
+		pr_err("Can't find file @%li associated with tun\n",
+		       (long)dev->u.tti.cpt_bindfile);
+		return -1;
+	}
+
+	tfe.id			= obj_id_of(file);
+	tfe.netdev		= (char *)dev->ni.cpt_name;
+
+	/*
+	 * FIXME These are not in cpt image :(
+	 */
+	tfe.has_detached	= true;
+	tfe.detached		= true;
+
+	return pb_write_one(fd, &tfe, PB_TUNFILE);
+}
+
 static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 {
 	NetDeviceEntry netdev = NET_DEVICE_ENTRY__INIT;
+	TunLinkEntry tun = TUN_LINK_ENTRY__INIT;
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_NETDEV);
+	int ret = 0;
 
 	if (!strncmp((char *)dev->ni.cpt_name, "lo", 2))
 		netdev.type = ND_TYPE__LOOPBACK;
@@ -173,7 +201,23 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 	netdev.flags	= dev->ni.cpt_flags;
 	netdev.name	= (char *)dev->ni.cpt_name;
 
-	return pb_write_one(fd, &netdev, PB_NETDEV);
+	switch ((int)netdev.type) {
+	case ND_TYPE__TUN:
+		ret = write_tundev(ctx, dev);
+
+		/*
+		 * FIXME No @vnethdr, @sndbuf, @group in image.
+		 */
+
+		netdev.tun	= &tun;
+		tun.flags	= dev->u.tti.cpt_if_flags;
+		tun.owner	= dev->u.tti.cpt_owner;
+		break;
+	}
+
+	ret |= pb_write_one(fd, &netdev, PB_NETDEV);
+
+	return ret;
 }
 
 int write_netdevs(context_t *ctx)
