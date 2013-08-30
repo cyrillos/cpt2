@@ -350,9 +350,10 @@ int write_ifaddr(context_t *ctx)
 		m = mslab_cast(buf, sizeof(buf));
 
 		/*
-		 * FIXME Only "lo" supported at the moment.
+		 * FIXME Only "lo" and "tun" supported at the moment.
 		 */
-		if (strcmp((char *)ifa->ii.cpt_label, "lo")) {
+		if (memcmp((char *)ifa->ii.cpt_label, "lo", 2) &&
+		    memcmp((char *)ifa->ii.cpt_label, "tun", 3)) {
 			pr_warn("Internet address for device %s skipped\n",
 				(char *)ifa->ii.cpt_label);
 			continue;
