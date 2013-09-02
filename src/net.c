@@ -207,16 +207,16 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 
 		/*
 		 * FIXME No @vnethdr, @sndbuf, @group in image.
+		 * While for @vnethdr and @sndbuf we simply
+		 * pick up values present in some real CRIU
+		 * dump image, @group is set to -1, just like
+		 * OpenVZ kernel does.
 		 */
 
 		netdev.tun	= &tun;
 		tun.flags	= dev->u.tti.cpt_flags;
 		tun.owner	= dev->u.tti.cpt_owner;
-
-		/*
-		 * FIXME This is not present in image
-		 * so pick some from real CRIU dump.
-		 */
+		tun.group	= -1;
 		tun.sndbuf	= 0x7fffffff;
 		tun.vnethdr	= 0xa;
 		break;
