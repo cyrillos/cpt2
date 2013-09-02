@@ -29,6 +29,7 @@
 #include "protobuf.h"
 #include "protobuf/pstree.pb-c.h"
 #include "protobuf/rlimit.pb-c.h"
+#include "protobuf/utsns.pb-c.h"
 #include "protobuf/creds.pb-c.h"
 #include "protobuf/core.pb-c.h"
 #include "protobuf/sa.pb-c.h"
@@ -416,7 +417,7 @@ static int write_task_kids(context_t *ctx, struct task_struct *t)
 	kids.pid_ns_id		= INIT_FORSE_NS(INIT_PID_NS_ID);
 	kids.net_ns_id		= INIT_FORSE_NS(INIT_NET_NS_ID);
 	kids.ipc_ns_id		= INIT_IPC_NS_ID;
-	kids.uts_ns_id		= INIT_UTS_NS_ID;
+	kids.uts_ns_id		= INIT_FORSE_NS(INIT_UTS_NS_ID);
 	kids.mnt_ns_id		= t->ti.cpt_namespace;
 
 	ret = pb_write_one(fd, &kids, PB_IDS);
@@ -472,14 +473,45 @@ static int write_task_creds(context_t *ctx, struct task_struct *t)
 
 static int write_task_utsns(context_t *ctx, struct task_struct *t)
 {
-	int ret = 0;
-	int fd = -1;
+	UtsnsEntry ue = UTSNS_ENTRY__INIT;
+	int ret = -1, fd = -1, pos = 0;
+	off_t start, end, next;
 
 	fd = open_image(ctx, CR_FD_UTSNS, O_DUMP, t->ti.cpt_pid);
 	if (fd < 0)
 		return -1;
-	goto out;
+
+	get_section_bounds(ctx, CPT_SECT_UTSNAME, &start, &end);
+	while (start < end) {
+		char *name;
+
+		name = read_name(ctx->fd, start, NULL, &next);
+		if (!name) {
+			pr_err("Can't read UTS string at @%li\n", start);
+			goto err;
+		}
+
+		switch (pos) {
+		case 0:
+			ue.nodename = name;
+			break;
+		case 1:
+			ue.domainname = name;
+			break;
+		case 2:
+			/* We don't care about release */
+			goto out;
+			break;
+		}
+
+		start += next;
+		pos++;
+	}
 out:
+	ret = pb_write_one(fd, &ue, PB_UTSNS);
+	xfree(ue.nodename);
+	xfree(ue.domainname);
+err:
 	close_safe(&fd);
 	return ret;
 }
