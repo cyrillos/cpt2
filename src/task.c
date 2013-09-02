@@ -410,15 +410,13 @@ static int write_task_kids(context_t *ctx, struct task_struct *t)
 	kids.has_mnt_ns_id	= true;
 
 	/*
-	 * FIXME See write_inventory() routine.
-	 * There IDs are taken for debug purpose
-	 * only!
+	 * See write_inventory() routine.
 	 */
 
-	kids.pid_ns_id		= 1;
-	kids.net_ns_id		= 1;
-	kids.ipc_ns_id		= 2;
-	kids.uts_ns_id		= 2;
+	kids.pid_ns_id		= INIT_FORSE_NS(INIT_PID_NS_ID);
+	kids.net_ns_id		= INIT_FORSE_NS(INIT_NET_NS_ID);
+	kids.ipc_ns_id		= INIT_IPC_NS_ID;
+	kids.uts_ns_id		= INIT_UTS_NS_ID;
 	kids.mnt_ns_id		= t->ti.cpt_namespace;
 
 	ret = pb_write_one(fd, &kids, PB_IDS);

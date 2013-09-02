@@ -11,6 +11,18 @@
 #include "bug.h"
 
 /*
+ * These are IDs we use for namespace creation
+ * in criu, when inventory read and IDs are
+ * compired with ones obtained from task images.
+ */
+#define INIT_PID_NS_ID		(2)
+#define INIT_NET_NS_ID		(2)
+#define INIT_IPC_NS_ID		(2)
+#define INIT_UTS_NS_ID		(2)
+#define INIT_MNT_NS_ID		(2)
+#define INIT_FORSE_NS(id)	((id) - 1)
+
+/*
  * Offsets associated with task, they lays right
  * after task image, in the order we bullet below.
  */

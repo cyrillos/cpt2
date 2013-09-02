@@ -50,17 +50,11 @@ static int write_inventory(context_t *ctx)
 	kids.has_uts_ns_id	= true;
 	kids.has_mnt_ns_id	= true;
 
-	/*
-	 * FIXME
-	 *
-	 * These values here left for debug purpose,
-	 * need some sane ones.
-	 */
-	kids.pid_ns_id		= 2;
-	kids.net_ns_id		= 2;
-	kids.ipc_ns_id		= 2;
-	kids.uts_ns_id		= 2;
-	kids.mnt_ns_id		= 2;
+	kids.pid_ns_id		= INIT_PID_NS_ID;
+	kids.net_ns_id		= INIT_NET_NS_ID;
+	kids.ipc_ns_id		= INIT_IPC_NS_ID;
+	kids.uts_ns_id		= INIT_UTS_NS_ID;
+	kids.mnt_ns_id		= INIT_MNT_NS_ID;
 
 	e.img_version		= CRTOOLS_IMAGES_V1;
 	e.fdinfo_per_id		= false;
