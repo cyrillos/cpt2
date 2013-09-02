@@ -761,7 +761,7 @@ static void show_process_tree()
 {
 	struct task_struct *p, *t;
 
-	if (wont_print(LOG_DEBUG))
+	if (pr_quelled(LOG_DEBUG))
 		return;
 
 	pr_debug("Built process tree\n");

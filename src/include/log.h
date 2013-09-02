@@ -17,7 +17,7 @@
 
 extern void loglevel_set(unsigned int loglevel);
 extern unsigned int loglevel_get(void);
-extern bool wont_print(unsigned int loglevel);
+extern bool pr_quelled(unsigned int loglevel);
 extern void print_on_level(unsigned int loglevel, const char *format, ...);
 
 #define pr_msg(fmt, ...)							\

@@ -29,7 +29,7 @@ unsigned int loglevel_get(void)
 	return current_loglevel;
 }
 
-bool wont_print(unsigned int loglevel)
+bool pr_quelled(unsigned int loglevel)
 {
 	return loglevel != LOG_MSG && loglevel > loglevel_get();
 }
@@ -46,7 +46,7 @@ void print_on_level(unsigned int loglevel, const char *format, ...)
 {
 	va_list params;
 
-	if (wont_print(loglevel))
+	if (pr_quelled(loglevel))
 		return;
 
 	va_start(params, format);
