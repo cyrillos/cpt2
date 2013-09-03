@@ -1027,7 +1027,9 @@ static int validate_task_early(context_t *ctx, struct task_struct *t)
 	}
 
 	/*
-	 * Make sure the task is in state we can deal with.
+	 * FIXME Make sure the task is in state we can deal with.
+	 * CRIU don't support stopped task yet, but we will need
+	 * to handle them later.
 	 */
 	if (task_is_stopped(t->ti.cpt_state)) {
 		pr_err("Stopped tasks are not supported yet\n");
