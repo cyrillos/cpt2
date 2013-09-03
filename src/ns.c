@@ -17,7 +17,8 @@
 #include "ns.h"
 
 #include "protobuf.h"
-#include "../../../protobuf/mnt.pb-c.h"
+#include "protobuf/mnt.pb-c.h"
+#include "protobuf/utsns.pb-c.h"
 
 struct ns_struct *root_ns;
 static int anon_dev_minor = 1;
@@ -143,6 +144,78 @@ static int get_dev(struct vfsmnt_struct *v)
 	return (int)st.st_dev;
 }
 
+static int write_task_ipc(context_t *ctx, struct task_struct *t)
+{
+	int ret = -1;
+	int fd_ipc_var = -1, fd_ipc_shm = -1;
+	int fd_ipc_msg = -1, fd_ipc_sem = -1;
+
+	fd_ipc_var = open_image(ctx, CR_FD_IPC_VAR, O_DUMP, t->ti.cpt_pid);
+	if (fd_ipc_var < 0)
+		goto out;
+	fd_ipc_shm = open_image(ctx, CR_FD_IPCNS_SHM, O_DUMP, t->ti.cpt_pid);
+	if (fd_ipc_shm < 0)
+		goto out;
+	fd_ipc_msg = open_image(ctx, CR_FD_IPCNS_MSG, O_DUMP, t->ti.cpt_pid);
+	if (fd_ipc_msg < 0)
+		goto out;
+	fd_ipc_sem = open_image(ctx, CR_FD_IPCNS_SEM, O_DUMP, t->ti.cpt_pid);
+	if (fd_ipc_sem < 0)
+		goto out;
+	ret = 0;
+out:
+	close_safe(&fd_ipc_var);
+	close_safe(&fd_ipc_shm);
+	close_safe(&fd_ipc_msg);
+	close_safe(&fd_ipc_sem);
+	return ret;
+}
+
+static int write_task_utsns(context_t *ctx, struct task_struct *t)
+{
+	UtsnsEntry ue = UTSNS_ENTRY__INIT;
+	int ret = -1, fd = -1, pos = 0;
+	off_t start, end, next;
+
+	fd = open_image(ctx, CR_FD_UTSNS, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	get_section_bounds(ctx, CPT_SECT_UTSNAME, &start, &end);
+	while (start < end) {
+		char *name;
+
+		name = read_name(ctx->fd, start, NULL, &next);
+		if (!name) {
+			pr_err("Can't read UTS string at @%li\n", start);
+			goto err;
+		}
+
+		switch (pos) {
+		case 0:
+			ue.nodename = name;
+			break;
+		case 1:
+			ue.domainname = name;
+			break;
+		case 2:
+			/* We don't care about release */
+			goto out;
+			break;
+		}
+
+		start += next;
+		pos++;
+	}
+out:
+	ret = pb_write_one(fd, &ue, PB_UTSNS);
+	xfree(ue.nodename);
+	xfree(ue.domainname);
+err:
+	close_safe(&fd);
+	return ret;
+}
+
 int read_ns(context_t *ctx)
 {
 	struct vfsmnt_struct *v = NULL;
@@ -252,6 +325,20 @@ int convert_ns(context_t *ctx)
 	ret = write_task_mountpoints(ctx, root_task);
 	if (ret) {
 		pr_err("Failed writing mountpoints for task %d\n",
+		       root_task->ti.cpt_pid);
+		goto out;
+	}
+
+	ret = write_task_utsns(ctx, root_task);
+	if (ret) {
+		pr_err("Failed writing utsns for task %d\n",
+		       root_task->ti.cpt_pid);
+		goto out;
+	}
+
+	ret = write_task_ipc(ctx, root_task);
+	if (ret) {
+		pr_err("Failed writing ipc for task %d\n",
 		       root_task->ti.cpt_pid);
 		goto out;
 	}
