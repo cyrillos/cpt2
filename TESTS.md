@@ -123,6 +123,7 @@ In progress
 -----------
 
 sh test/zdtm-cpt2.sh start static/signalfd00 static/fifo-ghost
+sh test/zdtm-cpt2.sh start static/msgque static/sem static/shm static/utsname
 
 Not yet run
 -----------
