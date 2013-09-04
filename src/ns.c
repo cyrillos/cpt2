@@ -19,6 +19,10 @@
 #include "protobuf.h"
 #include "protobuf/mnt.pb-c.h"
 #include "protobuf/utsns.pb-c.h"
+#include "protobuf/ipc-var.pb-c.h"
+#include "protobuf/ipc-shm.pb-c.h"
+#include "protobuf/ipc-sem.pb-c.h"
+#include "protobuf/ipc-msg.pb-c.h"
 
 struct ns_struct *root_ns;
 static int anon_dev_minor = 1;
@@ -144,11 +148,109 @@ static int get_dev(struct vfsmnt_struct *v)
 	return (int)st.st_dev;
 }
 
+static int write_task_ipc_sem(context_t *ctx, struct task_struct *t)
+{
+	IpcDescEntry desc = IPC_DESC_ENTRY__INIT;
+	IpcSemEntry sem = IPC_SEM_ENTRY__INIT;
+	int ret = -1, fd = -1;
+	off_t start, end;
+
+	fd = open_image(ctx, CR_FD_IPCNS_SEM, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	sem.desc = &desc;
+
+	/*
+	 * FIXME In CRIU no CPT_SECT_SYSVSEM_UNDO implemented, must
+	 * be addressed later.
+	 */
+
+	get_section_bounds(ctx, CPT_SECT_SYSV_SEM, &start, &end);
+	while (start < end) {
+		struct cpt_sysvsem_image v;
+		struct sem_pair {
+			u32	semval;
+			u32	sempid;
+		} s;
+		u16 value;
+		off_t at;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_SYSV_SEM, &v, start)) {
+			pr_err("Can't read SysV semaphore at @%li\n", start);
+			goto err;
+		}
+
+		at = start + v.cpt_hdrlen;
+		sem.nsems = (v.cpt_next - v.cpt_hdrlen) / sizeof(s);
+
+		/*
+		 * FIXME Why @cpt_seq, @cpt_otime and @cpt_ctime
+		 * are not present in CRIU?
+		 *
+		 * Sametime note the new kernel has no @sempid
+		 * member but an array of values.
+		 */
+		desc.key	= v.cpt_key;
+		desc.uid	= v.cpt_uid;
+		desc.gid	= v.cpt_gid;
+		desc.cuid	= v.cpt_cuid;
+		desc.cgid	= v.cpt_cgid;
+		desc.mode	= v.cpt_mode;
+		desc.id		= v.cpt_id;
+
+		if (pb_write_one(fd, &sem, PB_IPC_SEM)) {
+			pr_err("Failed to write IPC semaphore descriptor at @%li\n", start);
+			goto err;
+		}
+
+		start += v.cpt_next;
+
+		/*
+		 * Make sure the ctx->fd is at right position, don't
+		 * insert new io operations here.
+		 */
+
+		while (at < start) {
+			if (__read_ptr_at(ctx->fd, &s, at)) {
+				pr_err("Failed to read IPC semaphore value at @%li\n", at);
+				goto err;
+			}
+			value = s.semval;
+			if (__write_ptr(fd, &value)) {
+				pr_err("Failed to write IPC semaphore value from @%li\n", at);
+				goto err;
+			}
+
+			at += sizeof(s);
+		}
+
+		if (sem.nsems) {
+			u8 pad[sizeof(u64)];
+			size_t left;
+			left  = round_up((sem.nsems * sizeof(value)), sizeof(u64));
+			left -= (sem.nsems * sizeof(value));
+
+			BUG_ON(left > sizeof(pad));
+
+			if (__write(fd, pad, left)) {
+				pr_err("Failed to write IPC semaphore value pad\n");
+				goto err;
+			}
+		}
+	}
+
+	ret = 0;
+err:
+	close_safe(&fd);
+	return ret;
+}
+
 static int write_task_ipc(context_t *ctx, struct task_struct *t)
 {
 	int ret = -1;
 	int fd_ipc_var = -1, fd_ipc_shm = -1;
-	int fd_ipc_msg = -1, fd_ipc_sem = -1;
+	int fd_ipc_msg = -1;
 
 	fd_ipc_var = open_image(ctx, CR_FD_IPC_VAR, O_DUMP, t->ti.cpt_pid);
 	if (fd_ipc_var < 0)
@@ -159,15 +261,12 @@ static int write_task_ipc(context_t *ctx, struct task_struct *t)
 	fd_ipc_msg = open_image(ctx, CR_FD_IPCNS_MSG, O_DUMP, t->ti.cpt_pid);
 	if (fd_ipc_msg < 0)
 		goto out;
-	fd_ipc_sem = open_image(ctx, CR_FD_IPCNS_SEM, O_DUMP, t->ti.cpt_pid);
-	if (fd_ipc_sem < 0)
-		goto out;
-	ret = 0;
+
+	ret = write_task_ipc_sem(ctx, t);
 out:
 	close_safe(&fd_ipc_var);
 	close_safe(&fd_ipc_shm);
 	close_safe(&fd_ipc_msg);
-	close_safe(&fd_ipc_sem);
 	return ret;
 }
 
