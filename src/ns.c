@@ -246,20 +246,66 @@ err:
 	return ret;
 }
 
+static int write_ns_ipc_var(context_t *ctx, struct task_struct *t)
+{
+	IpcVarEntry var = IPC_VAR_ENTRY__INIT;
+	int ret = -1, fd = -1;
+	off_t start, end;
+
+	fd = open_image(ctx, CR_FD_IPC_VAR, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	get_section_bounds(ctx, CPT_SECT_VEINFO, &start, &end);
+	while (start < end) {
+		struct cpt_veinfo_image v;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_VEINFO, &v, start)) {
+			pr_err("Can't read veinfo at @%li\n", start);
+			goto err;
+		}
+
+		BUILD_BUG_ON(ARRAY_SIZE(v.sem_ctl_arr) != 4);
+
+		/*
+		 * FIXME There is no @auto_msgmni, @shm_rmid_forced,
+		 * @mq_queues_max, @mq_msg_max, @mq_msgsize_max in the
+		 * OpenVZ image.
+		 */
+
+		var.n_sem_ctls		= ARRAY_SIZE(v.sem_ctl_arr);
+		var.sem_ctls		= v.sem_ctl_arr;
+		var.msg_ctlmax		= v.msg_ctl_max;
+		var.msg_ctlmnb		= v.msg_ctl_mnb;
+		var.msg_ctlmni		= v.msg_ctl_mni;
+		var.shm_ctlmax		= v.shm_ctl_max;
+		var.shm_ctlall		= v.shm_ctl_all;
+		var.shm_ctlmni		= v.shm_ctl_mni;
+
+		ret = pb_write_one(fd, &var, PB_IPC_VAR);
+		if (ret < 0) {
+			pr_err("Failed to write IPC variables\n");
+			goto err;
+		}
+
+		break;
+	}
+	ret = 0;
+err:
+	close_safe(&fd);
+	return ret;
+}
+
 static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 {
 	int ret = -1;
-	int fd_ipc_var = -1, fd_ipc_shm = -1;
-	int fd_ipc_msg = -1;
+	int fd_ipc_msg = -1, fd_ipc_shm = -1;
 
 	/*
 	 * FIXME IPC conversion known to be buggy on OpenVZ behalf,
 	 * need to revisit it.
 	 */
 
-	fd_ipc_var = open_image(ctx, CR_FD_IPC_VAR, O_DUMP, t->ti.cpt_pid);
-	if (fd_ipc_var < 0)
-		goto out;
 	fd_ipc_shm = open_image(ctx, CR_FD_IPCNS_SHM, O_DUMP, t->ti.cpt_pid);
 	if (fd_ipc_shm < 0)
 		goto out;
@@ -267,9 +313,9 @@ static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 	if (fd_ipc_msg < 0)
 		goto out;
 
-	ret = write_ns_ipc_sem(ctx, t);
+	ret  = write_ns_ipc_sem(ctx, t);
+	ret |= write_ns_ipc_var(ctx, t);
 out:
-	close_safe(&fd_ipc_var);
 	close_safe(&fd_ipc_shm);
 	close_safe(&fd_ipc_msg);
 	return ret;
