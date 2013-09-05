@@ -252,6 +252,11 @@ static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 	int fd_ipc_var = -1, fd_ipc_shm = -1;
 	int fd_ipc_msg = -1;
 
+	/*
+	 * FIXME IPC conversion known to be buggy on OpenVZ behalf,
+	 * need to revisit it.
+	 */
+
 	fd_ipc_var = open_image(ctx, CR_FD_IPC_VAR, O_DUMP, t->ti.cpt_pid);
 	if (fd_ipc_var < 0)
 		goto out;
