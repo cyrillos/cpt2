@@ -80,7 +80,7 @@ static int getfstype(struct vfsmnt_struct *v)
 	return -1;
 }
 
-static int write_task_mountpoints(context_t *ctx, struct task_struct *t)
+static int write_ns_mountpoints(context_t *ctx, struct task_struct *t)
 {
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_MNTS);
 	struct vfsmnt_struct *v;
@@ -148,7 +148,7 @@ static int get_dev(struct vfsmnt_struct *v)
 	return (int)st.st_dev;
 }
 
-static int write_task_ipc_sem(context_t *ctx, struct task_struct *t)
+static int write_ns_ipc_sem(context_t *ctx, struct task_struct *t)
 {
 	IpcDescEntry desc = IPC_DESC_ENTRY__INIT;
 	IpcSemEntry sem = IPC_SEM_ENTRY__INIT;
@@ -246,7 +246,7 @@ err:
 	return ret;
 }
 
-static int write_task_ipc(context_t *ctx, struct task_struct *t)
+static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 {
 	int ret = -1;
 	int fd_ipc_var = -1, fd_ipc_shm = -1;
@@ -262,7 +262,7 @@ static int write_task_ipc(context_t *ctx, struct task_struct *t)
 	if (fd_ipc_msg < 0)
 		goto out;
 
-	ret = write_task_ipc_sem(ctx, t);
+	ret = write_ns_ipc_sem(ctx, t);
 out:
 	close_safe(&fd_ipc_var);
 	close_safe(&fd_ipc_shm);
@@ -270,7 +270,7 @@ out:
 	return ret;
 }
 
-static int write_task_utsns(context_t *ctx, struct task_struct *t)
+static int write_ns_utsns(context_t *ctx, struct task_struct *t)
 {
 	UtsnsEntry ue = UTSNS_ENTRY__INIT;
 	int ret = -1, fd = -1, pos = 0;
@@ -421,21 +421,21 @@ int convert_ns(context_t *ctx)
 {
 	int ret;
 
-	ret = write_task_mountpoints(ctx, root_task);
+	ret = write_ns_mountpoints(ctx, root_task);
 	if (ret) {
 		pr_err("Failed writing mountpoints for task %d\n",
 		       root_task->ti.cpt_pid);
 		goto out;
 	}
 
-	ret = write_task_utsns(ctx, root_task);
+	ret = write_ns_utsns(ctx, root_task);
 	if (ret) {
 		pr_err("Failed writing utsns for task %d\n",
 		       root_task->ti.cpt_pid);
 		goto out;
 	}
 
-	ret = write_task_ipc(ctx, root_task);
+	ret = write_ns_ipc(ctx, root_task);
 	if (ret) {
 		pr_err("Failed writing ipc for task %d\n",
 		       root_task->ti.cpt_pid);
