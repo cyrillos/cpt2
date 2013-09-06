@@ -390,26 +390,74 @@ err:
 	return ret;
 }
 
+static int write_ns_ipc_shm(context_t *ctx, struct task_struct *t)
+{
+	IpcDescEntry desc = IPC_DESC_ENTRY__INIT;
+	IpcShmEntry shm = IPC_SHM_ENTRY__INIT;
+	int fd, ret = -1;
+	off_t start, end;
+
+	fd = open_image(ctx, CR_FD_IPCNS_SHM, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	shm.desc = &desc;
+
+	get_section_bounds(ctx, CPT_SECT_SYSV_SHM, &start, &end);
+	while (start < end) {
+		struct cpt_sysvshm_image v;
+
+		/*
+		 * FIXME
+		 *
+		 * There is something seriously broken in SysV shared
+		 * memory checkoint. Need to revisit. At moment even
+		 * if the test has shared memory the CPT_SECT_SYSV_SHM
+		 * section remains empty :(.
+		 */
+
+		pr_err("SysV shared memory conversion is incomplete!\n");
+		goto err;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_SYSV_SHM, &v, start)) {
+			pr_err("Can't read SysV shm at @%li\n", start);
+			goto err;
+		}
+
+		/*
+		 * FIXME A number of members from cpt_sysvshm_image
+		 * is not present in CRIU, review!
+		 */
+
+		desc.key	= v.cpt_key;
+		desc.uid	= v.cpt_uid;
+		desc.gid	= v.cpt_gid;
+		desc.cuid	= v.cpt_cuid;
+		desc.cgid	= v.cpt_cgid;
+		desc.mode	= v.cpt_mode;
+		desc.id		= v.cpt_id;
+
+		if (pb_write_one(fd, &shm, PB_IPC_SHM))
+			goto err;
+		/* shm.size = ds->shm_segsz; */
+	}
+
+	ret = 0;
+err:
+	close_safe(&fd);
+	return ret;
+}
+
 static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 {
-	int ret = -1;
-	int fd_ipc_shm = -1;
-
 	/*
 	 * FIXME IPC conversion known to be buggy on OpenVZ behalf,
 	 * need to revisit it.
 	 */
-
-	fd_ipc_shm = open_image(ctx, CR_FD_IPCNS_SHM, O_DUMP, t->ti.cpt_pid);
-	if (fd_ipc_shm < 0)
-		goto out;
-
-	ret  = write_ns_ipc_sem(ctx, t);
-	ret |= write_ns_ipc_var(ctx, t);
-	ret |= write_ns_ipc_msg(ctx, t);
-out:
-	close_safe(&fd_ipc_shm);
-	return ret;
+	return	write_ns_ipc_sem(ctx, t) |
+		write_ns_ipc_var(ctx, t) |
+		write_ns_ipc_msg(ctx, t) |
+		write_ns_ipc_shm(ctx, t);
 }
 
 static int write_ns_utsns(context_t *ctx, struct task_struct *t)
