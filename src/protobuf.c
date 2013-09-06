@@ -23,7 +23,7 @@
  *  0 on success
  * -1 on error
  */
-int pb_write_one(int fd, void *obj, int type)
+int pb_native_write_one(int fd, void *obj, int type)
 {
 	u8 local[1024];
 	void *buf = (void *)&local;
