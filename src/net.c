@@ -62,21 +62,14 @@ struct netdev_struct *netdev_lookup(u32 cpt_index)
 	return NULL;
 }
 
-#if 0
 int write_routes(context_t *ctx)
 {
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
-	int p[2], ret = -1;
 	off_t start, end;
 
 	if (write_data(fd, &magic, sizeof(magic))) {
 		pr_err("Failed to write route magic\n");
-		return -1;
-	}
-
-	if (pipe(p)) {
-		pr_perror("Can't create pipe");
 		return -1;
 	}
 
@@ -85,7 +78,6 @@ int write_routes(context_t *ctx)
 	 * just copy it to output.
 	 */
 	get_section_bounds(ctx, CPT_SECT_NET_ROUTE, &start, &end);
-
 	while (start < end) {
 		struct cpt_object_hdr v;
 
@@ -94,50 +86,15 @@ int write_routes(context_t *ctx)
 		}
 
 		if (v.cpt_next > v.cpt_hdrlen) {
-			ssize_t ret_in, ret_out, len;
-
-			len = v.cpt_next - v.cpt_hdrlen;
-			ret_in = splice(ctx->fd, NULL, p[1], NULL, len, SPLICE_F_MOVE);
-			if (ret_in < 0) {
-				pr_perror("Can't splice %li bytes", (long)len);
-				goto out;
-			}
-
-			ret_out = splice(p[0], NULL, fd, NULL, len, SPLICE_F_MOVE);
-			if (ret_out < 0) {
-				pr_perror("Can't splice %li bytes", (long)len);
-				goto out;
-			}
-
-			if (ret_in != len || ret_out != len) {
-				pr_err("Splice only %li/%li bytes while %li expected\n",
-				       (long)ret_in, (long)ret_out, (long)len);
-				goto out;
+			if (splice_data(ctx->fd, fd, v.cpt_next - v.cpt_hdrlen)) {
+				pr_err("Failed to splice net route data at @%li\n", start);
+				return -1;
 			}
 		}
 		start += v.cpt_next;
 	}
-	ret = 0;
-
-out:
-	close(p[0]);
-	close(p[1]);
-	return ret;
-}
-#else
-int write_routes(context_t *ctx)
-{
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
-	u32 magic = ROUTE_DUMP_MAGIC;
-
-	if (write_data(fd, &magic, sizeof(magic))) {
-		pr_err("Failed to write route magic\n");
-		return -1;
-	}
-
 	return 0;
 }
-#endif
 
 void free_netdevs(context_t *ctx)
 {
