@@ -64,6 +64,7 @@ struct netdev_struct *netdev_lookup(u32 cpt_index)
 
 int write_routes(context_t *ctx)
 {
+#if 0
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
 	off_t start, end;
@@ -94,6 +95,16 @@ int write_routes(context_t *ctx)
 		start += v.cpt_next;
 	}
 	return 0;
+#else
+	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
+	u32 magic = ROUTE_DUMP_MAGIC;
+
+	if (write_data(fd, &magic, sizeof(magic))) {
+		pr_err("Failed to write route magic\n");
+		return -1;
+	}
+	return 0;
+#endif
 }
 
 void free_netdevs(context_t *ctx)
