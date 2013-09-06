@@ -296,10 +296,104 @@ err:
 	return ret;
 }
 
+static int write_ns_ipc_msg(context_t *ctx, struct task_struct *t)
+{
+	IpcDescEntry desc = IPC_DESC_ENTRY__INIT;
+	IpcMsgEntry msg = IPC_MSG_ENTRY__INIT;
+	int ret = -1, fd = -1;
+	off_t start, end;
+	size_t msg_qnum = 0;
+
+	fd = open_image(ctx, CR_FD_IPCNS_MSG, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
+
+	msg.desc = &desc;
+
+	get_section_bounds(ctx, CPT_SECT_SYSV_MSG, &start, &end);
+	while (start < end) {
+		struct cpt_sysvmsg_image v;
+		off_t at;
+
+		if (read_obj_cpt(ctx->fd, CPT_OBJ_SYSVMSG, &v, start)) {
+			pr_err("Can't read SysV message at @%li\n", start);
+			goto err;
+		}
+
+		/*
+		 * FIXME No @qnum in OpenVZ, just do seq increments.
+		 */
+
+		msg.qbytes = v.cpt_qbytes;
+		msg.qnum = msg_qnum++;
+
+		/*
+		 * FIXME @cpt_stime, @cpt_rtime, @cpt_ctime,
+		 * @cpt_last_sender, @cpt_last_receiver are
+		 * not present in criu, why?
+		 */
+
+		desc.key	= v.cpt_key;
+		desc.uid	= v.cpt_uid;
+		desc.gid	= v.cpt_gid;
+		desc.cuid	= v.cpt_cuid;
+		desc.cgid	= v.cpt_cgid;
+		desc.mode	= v.cpt_mode;
+		desc.id		= v.cpt_id;
+
+		if (pb_write_one(fd, &msg, PB_IPCNS_MSG_ENT))
+			goto err;
+
+		at = start + v.cpt_hdrlen;
+		start += v.cpt_next;
+
+		while (at < start) {
+			struct cpt_sysvmsg_msg_image i;
+			IpcMsg m = IPC_MSG__INIT;
+			size_t size;
+
+			if (read_obj_cpt(ctx->fd, CPT_OBJ_SYSVMSG_MSG, &i, at)) {
+				pr_err("Can't read SysV message header at @%li\n", at);
+				goto err;
+			}
+
+			size = i.cpt_next - i.cpt_hdrlen;
+			m.msize = i.cpt_size;
+			m.mtype = i.cpt_type;
+
+			if (pb_write_one(fd, &m, PB_IPCNS_MSG))
+				goto err;
+
+			if (size) {
+				u8 pad[sizeof(u64)] = { };
+				size_t left = round_up(size, sizeof(u64)) - size;
+
+				if (splice_data(ctx->fd, fd, size)) {
+					pr_err("Can't splice SysV message data at @%li\n", at);
+					goto err;
+				}
+
+				BUG_ON(left > sizeof(pad));
+				if (__write(fd, pad, left)) {
+					pr_err("Failed to write SysV message data pad\n");
+					goto err;
+				}
+			}
+
+			at += i.cpt_next;
+		}
+	}
+
+	ret = 0;
+err:
+	close_safe(&fd);
+	return ret;
+}
+
 static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 {
 	int ret = -1;
-	int fd_ipc_msg = -1, fd_ipc_shm = -1;
+	int fd_ipc_shm = -1;
 
 	/*
 	 * FIXME IPC conversion known to be buggy on OpenVZ behalf,
@@ -309,15 +403,12 @@ static int write_ns_ipc(context_t *ctx, struct task_struct *t)
 	fd_ipc_shm = open_image(ctx, CR_FD_IPCNS_SHM, O_DUMP, t->ti.cpt_pid);
 	if (fd_ipc_shm < 0)
 		goto out;
-	fd_ipc_msg = open_image(ctx, CR_FD_IPCNS_MSG, O_DUMP, t->ti.cpt_pid);
-	if (fd_ipc_msg < 0)
-		goto out;
 
 	ret  = write_ns_ipc_sem(ctx, t);
 	ret |= write_ns_ipc_var(ctx, t);
+	ret |= write_ns_ipc_msg(ctx, t);
 out:
 	close_safe(&fd_ipc_shm);
-	close_safe(&fd_ipc_msg);
 	return ret;
 }
 
