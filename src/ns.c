@@ -226,7 +226,7 @@ static int write_ns_ipc_sem(context_t *ctx, struct task_struct *t)
 		}
 
 		if (sem.nsems) {
-			u8 pad[sizeof(u64)];
+			u8 pad[sizeof(u64)] = { };
 			size_t left;
 			left  = round_up((sem.nsems * sizeof(value)), sizeof(u64));
 			left -= (sem.nsems * sizeof(value));
