@@ -64,7 +64,7 @@ struct netdev_struct *netdev_lookup(u32 cpt_index)
 
 int write_routes(context_t *ctx)
 {
-#if 0
+#if 1
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
 	off_t start, end;
@@ -370,6 +370,7 @@ int write_ifaddr(context_t *ctx)
 
 		m = mslab_cast(buf, sizeof(buf));
 
+#if 0
 		/*
 		 * FIXME Only "lo" and "tun" supported at the moment.
 		 */
@@ -379,6 +380,7 @@ int write_ifaddr(context_t *ctx)
 				(char *)ifa->ii.cpt_label);
 			continue;
 		}
+#endif
 
 		nlh = nlmsg_put(m, 0, 0, RTM_NEWADDR, sizeof(*ifm), NLM_F_MULTI);
 		BUG_ON(!nlh);
