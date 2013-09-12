@@ -522,8 +522,10 @@ int read_ns(context_t *ctx)
 		return -1;
 	INIT_LIST_HEAD(&ns->list);
 
-	if (read_obj_cpt(ctx->fd, CPT_OBJ_NAMESPACE, &ns->nsi, start))
+	if (read_obj_cpt(ctx->fd, CPT_OBJ_NAMESPACE, &ns->nsi, start)) {
+		obj_free_to(ns);
 		goto out;
+	}
 	obj_push_hash_to(ns, CPT_OBJ_NAMESPACE, start);
 
 	for (start += ns->nsi.cpt_hdrlen; start < end; start += h.cpt_next) {
