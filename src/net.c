@@ -64,7 +64,7 @@ struct netdev_struct *netdev_lookup(u32 cpt_index)
 
 int write_routes(context_t *ctx)
 {
-#if 1
+#if 0
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
 	off_t start, end;
