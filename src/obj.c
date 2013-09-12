@@ -131,6 +131,7 @@ char *obj_name(int objtype)
 	__obj_name(CPT_OBJ_EVENTFD)
 	__obj_name(CPT_OBJ_NET_BR)
 	__obj_name(CPT_OBJ_NET_BR_DEV)
+	__obj_name(CPT_OBJ_MOUNT_DATA)
 	__obj_name(CPT_OBJ_POSIX_TIMER)
 	__obj_name(CPT_OBJ_NET_TAP_FILTER)
 	}
