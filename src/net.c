@@ -370,7 +370,7 @@ int write_ifaddr(context_t *ctx)
 
 		m = mslab_cast(buf, sizeof(buf));
 
-#if 0
+#if 1
 		/*
 		 * FIXME Only "lo" and "tun" supported at the moment.
 		 */
