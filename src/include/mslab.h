@@ -28,7 +28,7 @@ static inline mslab_t *mslab_cast(void *where, unsigned long size)
 {
 	mslab_t *m = where;
 
-	m->start = m + sizeof(*m);
+	m->start = m + (unsigned long)sizeof(*m);
 	m->size = size - sizeof(*m);
 	mslab_reset(m);
 
