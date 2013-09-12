@@ -126,7 +126,7 @@ static int parse_sections(context_t *ctx)
 
 	pr_read_start("sections\n");
 	pr_debug("\t    type    start         end"
-		 "                       name full\n");
+		 "                       name data\n");
 	while (start < end) {
 		if (__read_ptr_at(ctx->fd, &h, start))
 			return -1;
