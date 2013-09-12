@@ -1100,8 +1100,10 @@ static struct file_struct *read_file(context_t *ctx, off_t start, off_t *next)
 	ret = file;
 	file = NULL;
 err:
-	if (file)
+	if (file) {
 		pr_err("Failed to read file at @%li\n", (long)start);
+		obj_free_to(file);
+	}
 	return ret;
 }
 
