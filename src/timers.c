@@ -48,7 +48,25 @@ static int write_posix_timers(context_t *ctx, struct task_struct *t)
 		while (start < end) {
 			PosixTimerEntry pte = POSIX_TIMER_ENTRY__INIT;
 
-			if (read_obj_cpt(ctx->fd, CPT_OBJ_POSIX_TIMER, &u.v, start)) {
+			/*
+			 * There a collision in OpenVZ image format:
+			 * CPT_OBJ_POSIX_TIMER happened to carry the
+			 * same value as CPT_OBJ_MOUNT_DATA in 78.22 to
+			 * 079.6 transition. So to not fail here read
+			 * the header then the body.
+			 */
+			if (read_obj_hdr(ctx->fd, &u.h, start)) {
+				pr_err("Can't read posix timer header at @%li\n", start);
+				goto out;
+			}
+
+			if (u.h.cpt_object != CPT_OBJ_POSIX_TIMER &&
+			    u.h.cpt_object != CPT_OBJ_MOUNT_DATA) {
+				pr_err("Can't detect posix timer header at @%li\n", start);
+				goto out;
+			}
+
+			if (read_obj_cont(ctx->fd, &u.v)) {
 				pr_err("Can't read posix timer at @%li\n", start);
 				goto out;
 			}
