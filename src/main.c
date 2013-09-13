@@ -10,6 +10,7 @@
 
 #include "compiler.h"
 #include "convert.h"
+#include "version.h"
 #include "cpt2.h"
 #include "log.h"
 #include "net.h"
@@ -24,12 +25,13 @@ int main(int argc, char *argv[])
 	unsigned int loglevel = DEFAULT_LOGLEVEL;
 	int opt, idx;
 
-	const char short_opts[] = "f:D:r:v:d";
+	const char short_opts[] = "f:D:r:v:dV";
 	static struct option long_opts[] = {
 		{ "dumpfile",		required_argument, 0, 'f' },
 		{ "root",		required_argument, 0, 'r' },
 		{ "images-dir",		required_argument, 0, 'D' },
 		{ "dry-run",		no_argument, 0, 'd' },
+		{ "version",		no_argument, 0, 'V' },
 		{ },
 	};
 
@@ -50,6 +52,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			io_read_only = true;
+			break;
+		case 'V':
+			pr_msg("version %s id %s\n", version, gitid);
+			return 0;
 			break;
 		case 'v':
 			if (optarg)
