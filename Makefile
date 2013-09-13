@@ -163,6 +163,9 @@ $(PROGRAM): src/built-in.o src/res/built-in.o $(CRIUDIR)/protobuf/built-in.o $(C
 
 all: $(PROGRAM)
 
+docs:
+	$(Q) $(MAKE) -s -C Documentation all
+
 tags:
 	$(E) "  GEN" $@
 	$(Q) $(RM) tags
@@ -172,6 +175,7 @@ clean:
 	$(E) "  CLEAN"
 	$(Q) $(MAKE) $(build)=src clean
 	$(Q) $(MAKE) $(build)=src/res clean
+	$(Q) $(MAKE) -s -C Documentation clean
 	$(Q) $(RM) $(PROGRAM)
 
 .DEFAULT_GOAL := all
