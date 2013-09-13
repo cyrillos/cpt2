@@ -11,7 +11,7 @@ cpt2 - convert OpenVZ dump files to CRIU format
 
 SYNOPSIS
 --------
-*cpt2* -f <dumpfile> -r <root> [-D <dir>] [-d]
+*cpt2* -f <dumpfile> -r <root> [-D <dir>] [-d] [-V]
 
 DESCRIPTION
 -----------
@@ -30,6 +30,9 @@ OPTIONS
 
 *-d*, *--dry-run*::
     Do not write anything on conversion.
+
+*-V*, *--version*::
+    Print program version and exit.
 
 AUTHOR
 ------
