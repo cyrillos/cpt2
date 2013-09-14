@@ -62,11 +62,67 @@ struct netdev_struct *netdev_lookup(u32 cpt_index)
 	return NULL;
 }
 
+/*
+ * There are some routes OpenVZ skips on restore. Thus
+ * do the same in converter.
+ */
+static int should_skip_route(struct nlmsghdr *nlh)
+{
+	int min_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+	struct rtmsg *rtm = NLMSG_DATA(nlh);
+	u32 prefix0 = 0;
+
+	if (nlh->nlmsg_len > min_len) {
+		int attrlen = nlh->nlmsg_len - NLMSG_ALIGN(min_len);
+		struct rtattr *rta = (void *)nlh + NLMSG_ALIGN(min_len);
+
+		while (RTA_OK(rta, attrlen)) {
+			switch (rta->rta_type) {
+			case RTA_DST:
+				prefix0 = *(u32 *)RTA_DATA(rta);
+				break;
+			/*
+			 * FIXME we ignore IFA_CACHEINFO info on restore,
+			 * thus simply drop such routes.
+			 */
+			case RTA_CACHEINFO:
+				return 1;
+			}
+			if (rta->rta_type == RTA_DST)
+				prefix0 = *(u32 *)RTA_DATA(rta);
+			rta = RTA_NEXT(rta, attrlen);
+		}
+	}
+
+	if (rtm->rtm_family == AF_INET6) {
+		if (rtm->rtm_type == RTN_LOCAL)
+			return 1;
+		if (rtm->rtm_flags & RTM_F_CLONED)
+			return 1;
+		if (rtm->rtm_protocol == RTPROT_UNSPEC		||
+		    rtm->rtm_protocol == RTPROT_RA		||
+		    rtm->rtm_protocol == RTPROT_REDIRECT	||
+		    rtm->rtm_protocol == RTPROT_KERNEL)
+			return 1;
+		if (rtm->rtm_protocol == RTPROT_BOOT) {
+			if ((rtm->rtm_dst_len ==  8 && prefix0 == htonl(0xFF000000)) ||
+			    (rtm->rtm_dst_len == 64 && prefix0 == htonl(0xFE800000)))
+			return 1;
+		}
+	}
+
+	if (rtm->rtm_protocol == RTPROT_KERNEL)
+		return 1;
+
+	return 0;
+}
+
 int write_routes(context_t *ctx)
 {
-#if 0
+#if 1
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
+	char data[PAGE_SIZE];
 	off_t start, end;
 
 	if (write_data(fd, &magic, sizeof(magic))) {
@@ -75,23 +131,60 @@ int write_routes(context_t *ctx)
 	}
 
 	/*
-	 * OpenVZ save routes in plain netlink stream so
-	 * just copy it to output.
+	 * OpenVZ save routes in plain netlink stream. Still we
+	 * need to align data thus ip tool in CRIU would understand it.
 	 */
 	get_section_bounds(ctx, CPT_SECT_NET_ROUTE, &start, &end);
 	while (start < end) {
 		struct cpt_object_hdr v;
+		off_t from, to;
 
 		if (read_obj_cpt(ctx->fd, CPT_OBJ_NET_ROUTE, &v, start)) {
 			pr_err("Can't read route object at @%li\n", (long)start);
+			return -1;
 		}
 
-		if (v.cpt_next > v.cpt_hdrlen) {
-			if (splice_data(ctx->fd, fd, v.cpt_next - v.cpt_hdrlen)) {
-				pr_err("Failed to splice net route data at @%li\n", start);
+		from	= start + v.cpt_hdrlen;
+		to	= start + v.cpt_next;
+
+		while (from < to) {
+			struct nlmsghdr *nh = (void *)data;
+			struct nlmsghdr *n = &nh[1];
+			size_t size;
+
+			if (__read_ptr_at(ctx->fd, nh, from)) {
+				pr_err("Can't read nlmsghdr at @%li\n", (long)from);
 				return -1;
 			}
+
+			size = NLMSG_ALIGN(nh->nlmsg_len);
+			if (!size)
+				break;
+
+			if (size > sizeof(data)) {
+				pr_err("The nlmsg length is too big %d at @%li\n",
+				       (int)size, (long)from);
+				return -1;
+			}
+
+			if (__read(ctx->fd, n, nh->nlmsg_len)) {
+				pr_err("Can't read nlmsghdr at @%li\n", (long)from);
+				return -1;
+			}
+
+			if (!should_skip_route(nh)) {
+				/*
+				 * Write data back to image.
+				 */
+				if (write_data(fd, data, size)) {
+					pr_perror("Can't write nlmsghdr at @%li", (long)from);
+					return -1;
+				}
+			}
+
+			from += size;
 		}
+
 		start += v.cpt_next;
 	}
 	return 0;
