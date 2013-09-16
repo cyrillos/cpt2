@@ -12,14 +12,11 @@
 
 bool io_read_only = false;
 
-int splice_data(int from, int to, size_t size)
+int __splice_data(int from, int to, size_t size)
 {
 	int attempts = 16; /* Default number of buffers in pipe */
 	ssize_t ret_in, ret_out;
 	int p[2];
-
-	if (io_read_only)
-		return 0;
 
 	if (pipe(p)) {
 		pr_perror("Can't create transport for splicing data");
@@ -54,6 +51,14 @@ int splice_data(int from, int to, size_t size)
 	return 0;
 err:
 	return -1;
+}
+
+int splice_data(int from, int to, size_t size)
+{
+	if (io_read_only)
+		return 0;
+
+	return __splice_data(from, to, size);
 }
 
 int read_data(int fd, void *ptr, size_t size, bool eof)
