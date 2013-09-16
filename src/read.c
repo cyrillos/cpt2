@@ -126,7 +126,9 @@ static int parse_sections(context_t *ctx)
 
 	pr_read_start("sections\n");
 	pr_debug("\t    type    start         end"
-		 "                       name data\n");
+		 "           len                 "
+		 "     name data\n");
+
 	while (start < end) {
 		if (__read_ptr_at(ctx->fd, &h, start))
 			return -1;
@@ -139,9 +141,10 @@ static int parse_sections(context_t *ctx)
 		if (h.cpt_section >= CPT_SECT_MAX)
 			goto err;
 
-		pr_debug("\t%8d    @%-12li @%-12li %16s %c\n",
+		pr_debug("\t%8d    @%-12li @%-12li %-12li %16s %c\n",
 			 h.cpt_section, (long)start,
 			 (long)(start + h.cpt_next),
+			 (long)h.cpt_next,
 			 section_name(h.cpt_section),
 			 (h.cpt_next != h.cpt_hdrlen) ? '+' : '-');
 
