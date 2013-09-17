@@ -249,8 +249,7 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 	else if (!strncmp((char *)dev->ni.cpt_name, "tun", 3))
 		netdev.type = ND_TYPE__TUN;
 	else if (!strncmp((char *)dev->ni.cpt_name, "venet", 5)) {
-		pr_info("Netdevice `%s' detected, ignore\n", dev->ni.cpt_name);
-		return 0;
+		netdev.type = ND_TYPE__VENET;
 	} else {
 		pr_err("Unsupported netdevice `%s'\n",
 		       dev->ni.cpt_name);
@@ -463,7 +462,7 @@ int write_ifaddr(context_t *ctx)
 
 		m = mslab_cast(buf, sizeof(buf));
 
-#if 1
+#if 0
 		/*
 		 * FIXME Only "lo" and "tun" supported at the moment.
 		 */
