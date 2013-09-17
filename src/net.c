@@ -242,6 +242,11 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 	int fd = fdset_fd(ctx->fdset_ns, CR_FD_NETDEV);
 	int ret = 0;
 
+	/*
+	 * FIXME CPT_OBJ_NET_VETH is not handled in
+	 * read_netdev_payload.
+	 */
+
 	if (!strncmp((char *)dev->ni.cpt_name, "lo", 2))
 		netdev.type = ND_TYPE__LOOPBACK;
 	else if (!strncmp((char *)dev->ni.cpt_name, "veth", 4))
