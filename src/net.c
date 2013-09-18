@@ -243,22 +243,27 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 	int ret = 0;
 
 	/*
-	 * FIXME CPT_OBJ_NET_VETH is not handled in
-	 * read_netdev_payload.
+	 * Best type match is by @dev->utype, but it's not
+	 * always available.
 	 */
-
-	if (!strncmp((char *)dev->ni.cpt_name, "lo", 2))
-		netdev.type = ND_TYPE__LOOPBACK;
-	else if (!strncmp((char *)dev->ni.cpt_name, "veth", 4))
-		netdev.type = ND_TYPE__VETH;
-	else if (!strncmp((char *)dev->ni.cpt_name, "tun", 3))
+	switch (dev->utype) {
+	case CPT_OBJ_NET_TUNTAP:
 		netdev.type = ND_TYPE__TUN;
-	else if (!strncmp((char *)dev->ni.cpt_name, "venet", 5)) {
-		netdev.type = ND_TYPE__VENET;
-	} else {
-		pr_err("Unsupported netdevice `%s'\n",
-		       dev->ni.cpt_name);
-		return -1;
+		break;
+	case CPT_OBJ_NET_VETH:
+		netdev.type = ND_TYPE__VETH;
+		break;
+	default:
+		if (!strncmp((char *)dev->ni.cpt_name, "lo", 2))
+			netdev.type = ND_TYPE__LOOPBACK;
+		else if (!strncmp((char *)dev->ni.cpt_name, "venet", 5))
+			netdev.type = ND_TYPE__VENET;
+		else {
+			pr_err("Unsupported netdevice `%s'\n",
+			       dev->ni.cpt_name);
+			return -1;
+		}
+		break;
 	}
 
 	netdev.ifindex	= dev->ni.cpt_index;
