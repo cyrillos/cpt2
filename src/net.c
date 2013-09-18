@@ -375,6 +375,12 @@ static int read_netdev_payload(context_t *ctx, struct netdev_struct *dev, off_t 
 			 * so skip them for a while.
 			 */
 			break;
+		case CPT_OBJ_NET_VETH:
+			memcpy((void *)&dev->u.vti, &hdr, sizeof(hdr));
+			if (read_obj_cont(ctx->fd, &dev->u.vti))
+				goto cont_failed;
+			dev->utype = CPT_OBJ_NET_VETH;
+			break;
 		default:
 			pr_err("Bad object %s at @%li\n",
 			       obj_name(hdr.cpt_object), (long)start);
