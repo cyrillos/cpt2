@@ -356,7 +356,7 @@ static int read_netdev_payload(context_t *ctx, struct netdev_struct *dev, off_t 
 			memcpy((void *)&dev->u.tti, &hdr, sizeof(hdr));
 			if (read_obj_cont(ctx->fd, &dev->u.tti))
 				goto cont_failed;
-			dev->utype = hdr.cpt_object;
+			dev->utype = CPT_OBJ_NET_TUNTAP;
 			if (dev->u.tti.cpt_next > dev->u.tti.cpt_hdrlen) {
 				/*
 				 * FIXME Here might be CPT_OBJ_NET_TAP_FILTER.
