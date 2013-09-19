@@ -167,7 +167,7 @@ docs:
 	$(Q) $(MAKE) -s -C Documentation all
 
 tags:
-	$(E) "  GEN" $@
+	$(E) "  GEN     " $@
 	$(Q) $(RM) tags
 	$(Q) $(FIND) -L . $(CRIUDIR)/include $(CRIUDIR)/arch/$(ARCH)/include $(CRIUDIR)/protobuf -name '*.[hcS]' ! -path './.*' -print | xargs ctags -a
 

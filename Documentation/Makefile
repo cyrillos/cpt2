@@ -13,6 +13,6 @@ all: $(MANS)
 	$(Q) $(XMLTO) man --skip-validation $(patsubst %.1,%.xml,$@) 2>/dev/null
 
 clean:
-	$(E) "  CLEAN   "
+	$(E) "  CLEANUP  docs"
 	$(Q) rm -f ./*.xml
 	$(Q) rm -f ./*.1
