@@ -111,8 +111,10 @@ static int should_skip_route(struct nlmsghdr *nlh)
 		}
 	}
 
+#if 0
 	if (rtm->rtm_protocol == RTPROT_KERNEL)
 		return 1;
+#endif
 
 	return 0;
 }
