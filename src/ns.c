@@ -82,17 +82,22 @@ static int getfstype(struct vfsmnt_struct *v)
 
 static int write_ns_mountpoints(context_t *ctx, struct task_struct *t)
 {
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_MNTS);
 	struct vfsmnt_struct *v;
 	struct ns_struct *ns;
 	MntEntry e;
+	int fd;
 
 	BUG_ON(t != root_task);
+
+	fd = open_image(ctx, CR_FD_MNTS, O_DUMP, t->ti.cpt_pid);
+	if (fd < 0)
+		return -1;
 
 	ns = obj_lookup_to(CPT_OBJ_NAMESPACE, t->ti.cpt_namespace);
 	if (!ns) {
 		pr_err("Can't find namespace at @%li\n",
 		       (long)t->ti.cpt_namespace);
+		close(fd);
 		return -1;
 	}
 
@@ -109,10 +114,13 @@ static int write_ns_mountpoints(context_t *ctx, struct task_struct *t)
 		e.source		= v->mnt_dev;
 		e.options		= NULL;
 
-		if (pb_write_one(fd, &e, PB_MNT))
+		if (pb_write_one(fd, &e, PB_MNT)) {
+			close(fd);
 			return -1;
+		}
 	}
 
+	close(fd);
 	return 0;
 }
 

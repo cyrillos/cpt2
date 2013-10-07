@@ -149,7 +149,7 @@ int convert(void)
 	 * No nested namespace support in CRIU, thus
 	 * just get pid from the root task.
 	 */
-	ret = context_init_fdset_ns(&ctx, root_task->ti.cpt_pid);
+	ret = context_init_fdset_netns(&ctx, root_task->ti.cpt_pid);
 	if (ret)
 		goto out;
 

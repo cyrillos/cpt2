@@ -32,11 +32,11 @@ int context_init_fdset_glob(context_t *ctx)
 	return 0;
 }
 
-int context_init_fdset_ns(context_t *ctx, pid_t pid)
+int context_init_fdset_netns(context_t *ctx, pid_t pid)
 {
 	struct fdset *fdset;
 
-	context_fini_fdset_ns(ctx);
+	context_fini_fdset_netns(ctx);
 
 	fdset = fdset_alloc(_CR_FD_NETNS_FROM,
 			    _CR_FD_NETNS_TO - _CR_FD_NETNS_FROM);
@@ -44,7 +44,7 @@ int context_init_fdset_ns(context_t *ctx, pid_t pid)
 		pr_err("Can't allocate ns fdset\n");
 		return -1;
 	}
-	ctx->fdset_ns = fdset;
+	ctx->fdset_netns = fdset;
 
 	if (open_image_fdset(ctx, fdset, pid,
 			     _CR_FD_NETNS_FROM,
@@ -61,9 +61,9 @@ void context_fini_fdset_glob(context_t *ctx)
 	fdset_free(&ctx->fdset_glob);
 }
 
-void context_fini_fdset_ns(context_t *ctx)
+void context_fini_fdset_netns(context_t *ctx)
 {
-	fdset_free(&ctx->fdset_ns);
+	fdset_free(&ctx->fdset_netns);
 }
 
 void context_init(context_t *ctx)
@@ -78,5 +78,5 @@ void context_fini(context_t *ctx)
 	close_safe(&ctx->dfd);
 	close_safe(&ctx->rootfd);
 	context_fini_fdset_glob(ctx);
-	context_fini_fdset_ns(ctx);
+	context_fini_fdset_netns(ctx);
 }

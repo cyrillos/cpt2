@@ -122,7 +122,7 @@ static int should_skip_route(struct nlmsghdr *nlh)
 int write_routes(context_t *ctx)
 {
 #if 1
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
+	int fd = fdset_fd(ctx->fdset_netns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
 	char data[PAGE_SIZE];
 	off_t start, end;
@@ -191,7 +191,7 @@ int write_routes(context_t *ctx)
 	}
 	return 0;
 #else
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_ROUTE);
+	int fd = fdset_fd(ctx->fdset_netns, CR_FD_ROUTE);
 	u32 magic = ROUTE_DUMP_MAGIC;
 
 	if (write_data(fd, &magic, sizeof(magic))) {
@@ -241,7 +241,7 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 {
 	NetDeviceEntry netdev = NET_DEVICE_ENTRY__INIT;
 	TunLinkEntry tun = TUN_LINK_ENTRY__INIT;
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_NETDEV);
+	int fd = fdset_fd(ctx->fdset_netns, CR_FD_NETDEV);
 	int ret = 0;
 
 	/*
@@ -463,7 +463,7 @@ void free_ifaddr(context_t *ctx)
 
 int write_ifaddr(context_t *ctx)
 {
-	int fd = fdset_fd(ctx->fdset_ns, CR_FD_IFADDR);
+	int fd = fdset_fd(ctx->fdset_netns, CR_FD_IFADDR);
 	u32 magic = IFADDR_DUMP_MAGIC;
 	struct ifaddr_struct *ifa;
 
