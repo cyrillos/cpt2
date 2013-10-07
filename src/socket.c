@@ -674,6 +674,12 @@ static int write_tcp(context_t *ctx, struct file_struct *file, struct sock_struc
 		tse.has_timestamp	= true;
 	}
 
+	tse.has_cork	= true;
+	tse.cork	= !!(sk->si.cpt_nonagle & TCP_NAGLE_CORK);
+
+	tse.has_nodelay	= true;
+	tse.nodelay	= !!(sk->si.cpt_nonagle & TCP_NAGLE_OFF);
+
 	if (pb_write_one(fd, &tse, PB_TCP_STREAM))
 		goto err;
 

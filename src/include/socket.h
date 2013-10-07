@@ -77,6 +77,10 @@ enum {
 #define TCPI_OPT_ECN_SEEN	16 /* we received at least one packet with ECT */
 #define TCPI_OPT_SYN_DATA	32 /* SYN-ACK acked data in SYN sent or rcvd */
 
+#define TCP_NAGLE_OFF		1 /* Nagle's algo is disabled */
+#define TCP_NAGLE_CORK		2 /* Socket is corked	    */
+#define TCP_NAGLE_PUSH		4 /* Cork is overridden for already queued data */
+
 #define INVALID_INDEX	-1
 #define USK_EXTERN	(1 << 0)
 
