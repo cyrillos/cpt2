@@ -38,8 +38,8 @@ int context_init_fdset_ns(context_t *ctx, pid_t pid)
 
 	context_fini_fdset_ns(ctx);
 
-	fdset = fdset_alloc(_CR_FD_NS_FROM,
-			    _CR_FD_NS_TO - _CR_FD_NS_FROM);
+	fdset = fdset_alloc(_CR_FD_NETNS_FROM,
+			    _CR_FD_NETNS_TO - _CR_FD_NETNS_FROM);
 	if (!fdset) {
 		pr_err("Can't allocate ns fdset\n");
 		return -1;
@@ -47,8 +47,8 @@ int context_init_fdset_ns(context_t *ctx, pid_t pid)
 	ctx->fdset_ns = fdset;
 
 	if (open_image_fdset(ctx, fdset, pid,
-			     _CR_FD_NS_FROM,
-			     _CR_FD_NS_TO, O_DUMP)) {
+			     _CR_FD_NETNS_FROM,
+			     _CR_FD_NETNS_TO, O_DUMP)) {
 		pr_err("Failed to open ns fdset\n");
 		return -1;
 	}

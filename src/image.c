@@ -16,7 +16,7 @@
 
 #include "cr-show.h"
 
-#define GEN_SHOW_STUB(name)	void name(int fd) { }
+#define GEN_SHOW_STUB(name)	void name(int fd, void *obj) { }
 
 void show_fown_cont(void *p) { }
 
@@ -34,7 +34,6 @@ GEN_SHOW_STUB(show_fifo);
 GEN_SHOW_STUB(show_fifo_data);
 GEN_SHOW_STUB(show_pstree);
 GEN_SHOW_STUB(show_sigacts);
-GEN_SHOW_STUB(show_siginfo);
 GEN_SHOW_STUB(show_itimers);
 GEN_SHOW_STUB(show_creds);
 GEN_SHOW_STUB(show_fs);
@@ -69,6 +68,8 @@ GEN_SHOW_STUB(show_mountpoints);
 GEN_SHOW_STUB(show_netdevices);
 GEN_SHOW_STUB(show_stats);
 GEN_SHOW_STUB(show_posix_timers);
+
+void show_siginfo(int fd);
 
 int open_image(context_t *ctx, int type, int flags, ...)
 {
