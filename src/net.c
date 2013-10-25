@@ -259,7 +259,7 @@ static int write_netdev(context_t *ctx, struct netdev_struct *dev)
 		if (!strncmp((char *)dev->ni.cpt_name, "lo", 2))
 			netdev.type = ND_TYPE__LOOPBACK;
 		else if (!strncmp((char *)dev->ni.cpt_name, "venet", 5))
-			netdev.type = ND_TYPE__VENET;
+			netdev.type = ND_TYPE__EXTLINK;
 		else {
 			pr_err("Unsupported netdevice `%s'\n",
 			       dev->ni.cpt_name);
