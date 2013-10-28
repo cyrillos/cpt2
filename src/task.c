@@ -849,6 +849,7 @@ static void show_task_cont(context_t *ctx, struct task_struct *t)
 		 "\t\tcomm '%s' session %d leader %d 64bit %d\n"
 		 "\t\tmm @%-10li files @%-10li fs @%-10li signal @%-10li sighand @%-10li\n"
 		 "\t\tstate %-8ld exit_code %-8ld posix_timers @%-10li\n"
+		 "\t\trblock {%#lx %ld %ld %ld %ld}\n"
 		 "\t\t\t%s\n",
 		 obj_pos_of(t), ti->cpt_pid, ti->cpt_tgid, ti->cpt_ppid,
 		 ti->cpt_rppid, ti->cpt_pgrp, ti->cpt_comm, ti->cpt_session,
@@ -856,6 +857,11 @@ static void show_task_cont(context_t *ctx, struct task_struct *t)
 		 (long)ti->cpt_files, (long)ti->cpt_fs,
 		 (long)ti->cpt_signal, (long)ti->cpt_sighand,
 		 (long)ti->cpt_state, (long)ti->cpt_exit_code,
+		 (long)ti->cpt_restart.fn,
+		 (long)ti->cpt_restart.arg0,
+		 (long)ti->cpt_restart.arg1,
+		 (long)ti->cpt_restart.arg2,
+		 (long)ti->cpt_restart.arg3,
 		 (long)ti->cpt_posix_timers, get_task_state(t));
 }
 
