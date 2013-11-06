@@ -11,7 +11,6 @@
 #include "image.h"
 #include "files.h"
 #include "read.h"
-#include "vdso.h"
 #include "log.h"
 #include "obj.h"
 #include "bug.h"

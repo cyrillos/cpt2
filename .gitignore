@@ -15,5 +15,8 @@ src/res/vdso-rhel.h
 src/res/vdso-rhel5.c
 src/res/vdso-rhel6.c
 src/include/version.h
+src/protobuf/*.[ch]
+src/include/config.h
+src/include/protobuf-desc-gen.h
 test
 patches

@@ -14,63 +14,6 @@
 #include "bug.h"
 #include "io.h"
 
-#include "cr-show.h"
-
-#define GEN_SHOW_STUB(name)	void name(int fd, void *obj) { }
-
-void show_fown_cont(void *p) { }
-
-GEN_SHOW_STUB(show_files);
-GEN_SHOW_STUB(show_pagemap);
-GEN_SHOW_STUB(show_reg_files);
-GEN_SHOW_STUB(show_ns_files);
-GEN_SHOW_STUB(show_core);
-GEN_SHOW_STUB(show_ids);
-GEN_SHOW_STUB(show_mm);
-GEN_SHOW_STUB(show_vmas);
-GEN_SHOW_STUB(show_pipes);
-GEN_SHOW_STUB(show_pipes_data);
-GEN_SHOW_STUB(show_fifo);
-GEN_SHOW_STUB(show_fifo_data);
-GEN_SHOW_STUB(show_pstree);
-GEN_SHOW_STUB(show_sigacts);
-GEN_SHOW_STUB(show_itimers);
-GEN_SHOW_STUB(show_creds);
-GEN_SHOW_STUB(show_fs);
-GEN_SHOW_STUB(show_remap_files);
-GEN_SHOW_STUB(show_ghost_file);
-GEN_SHOW_STUB(show_eventfds);
-GEN_SHOW_STUB(show_tty);
-GEN_SHOW_STUB(show_tty_info);
-GEN_SHOW_STUB(show_file_locks);
-GEN_SHOW_STUB(show_rlimit);
-GEN_SHOW_STUB(show_inventory);
-GEN_SHOW_STUB(show_raw_image);
-GEN_SHOW_STUB(show_eventpoll);
-GEN_SHOW_STUB(show_eventpoll_tfd);
-GEN_SHOW_STUB(show_signalfd);
-GEN_SHOW_STUB(show_inotify);
-GEN_SHOW_STUB(show_inotify_wd);
-GEN_SHOW_STUB(show_fanotify);
-GEN_SHOW_STUB(show_fanotify_mark);
-GEN_SHOW_STUB(show_unixsk);
-GEN_SHOW_STUB(show_inetsk);
-GEN_SHOW_STUB(show_packetsk);
-GEN_SHOW_STUB(show_netlinksk);
-GEN_SHOW_STUB(show_sk_queues);
-GEN_SHOW_STUB(show_utsns);
-GEN_SHOW_STUB(show_ipc_var);
-GEN_SHOW_STUB(show_ipc_shm);
-GEN_SHOW_STUB(show_ipc_msg);
-GEN_SHOW_STUB(show_ipc_sem);
-GEN_SHOW_STUB(show_tcp_stream);
-GEN_SHOW_STUB(show_mountpoints);
-GEN_SHOW_STUB(show_netdevices);
-GEN_SHOW_STUB(show_stats);
-GEN_SHOW_STUB(show_posix_timers);
-
-void show_siginfo(int fd);
-
 int open_image(context_t *ctx, int type, int flags, ...)
 {
 	char path[PATH_MAX];

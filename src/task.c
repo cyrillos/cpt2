@@ -1,14 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <syscall.h>
 
 #include <sys/types.h>
 #include <linux/futex.h>
 #include <linux/sched.h>
 
 #include "asm/fpu.h"
-
-#include "syscall-codes.h"
 
 #include "cpt-image.h"
 #include "hashtable.h"

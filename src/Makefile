@@ -23,7 +23,18 @@ obj-y	+= timers.o
 obj-y	+= socket.o
 obj-y	+= util.o
 
+obj-y	+= protobuf-desc.o
+obj-y	+= image-desc.o
+
 cflags-y += -iquote include
+
+PROTOBUF_GEN := scripts/protobuf-gen.sh
+$(obj)/protobuf-desc.c: $(obj)/include/protobuf-desc-gen.h
+$(obj)/include/protobuf-desc-gen.h: $(PROTOBUF_GEN) $(obj)/include/protobuf-desc.h
+	$(E) "  GEN     " $@
+	$(Q) $(SH) $(PROTOBUF_GEN) $(obj)/include/protobuf-desc.h > $@
+
+cleanup-y += $(obj)/include/protobuf-desc-gen.h
 
 ifneq ($(MAKECMDGOALS),clean)
 incdeps := y

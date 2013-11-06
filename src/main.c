@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 			io_read_only = true;
 			break;
 		case 'V':
-			pr_msg("version %s id %s\n", version, gitid);
+			pr_msg("version %s id %s\n", CPT2_VERSION, CPT2_GITID);
 			return 0;
 			break;
 		case 'v':

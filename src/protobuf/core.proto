@@ -1,0 +1,58 @@
+import "core-x86.proto";
+import "core-arm.proto";
+
+message task_core_entry {
+	required uint32			task_state	= 1;
+	required uint32			exit_code	= 2;
+
+	required uint32			personality	= 3;
+	required uint32			flags		= 4;
+	required uint64			blk_sigset	= 5;
+
+	required string			comm		= 6;
+}
+
+message task_kobj_ids_entry {
+	required uint32			vm_id		= 1;
+	required uint32			files_id	= 2;
+	required uint32			fs_id		= 3;
+	required uint32			sighand_id	= 4;
+
+	optional uint32			pid_ns_id	= 5;
+	optional uint32			net_ns_id	= 6;
+	optional uint32			ipc_ns_id	= 7;
+	optional uint32			uts_ns_id	= 8;
+	optional uint32			mnt_ns_id	= 9;
+}
+
+message thread_sas_entry {
+	required uint64			ss_sp		= 1;
+	required uint64			ss_size		= 2;
+	required uint32			ss_flags	= 3;
+}
+
+message thread_core_entry {
+	required uint64			futex_rla	= 1;
+	required uint32			futex_rla_len	= 2;
+	optional sint32			sched_nice	= 3;
+	optional uint32			sched_policy	= 4;
+	optional uint32			sched_prio	= 5;
+	optional uint64			blk_sigset	= 6;
+	optional thread_sas_entry	sas		= 7;
+}
+
+message core_entry {
+	enum march {
+		UNKNOWN		= 0;
+		X86_64		= 1;
+		ARM             = 2;
+	}
+
+	required march			mtype		= 1;
+	optional thread_info_x86	thread_info	= 2;
+	optional thread_info_arm	ti_arm		= 6;
+
+	optional task_core_entry	tc		= 3;
+	optional task_kobj_ids_entry	ids		= 4;
+	optional thread_core_entry	thread_core	= 5;
+}

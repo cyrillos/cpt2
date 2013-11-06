@@ -9,7 +9,6 @@
 
 #include "cpt-image.h"
 #include "fsnotify.h"
-#include "signalfd.h"
 #include "compiler.h"
 #include "magicfs.h"
 #include "xmalloc.h"
